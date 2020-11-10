@@ -2,10 +2,10 @@
 # OCAMLPARAM: unset
 # Workspace root: "/home/kznts9v_1lya/Education/Functional
 # programming/fp2020hw"
-$ /usr/bin/nproc > /tmp/duneb9202e.output 2> /dev/null
+$ /usr/bin/nproc > /tmp/dune61b949.output 2> /dev/null
 # Auto-detected concurrency: 8
 # disable binary cache
-$ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune19844a.output
+$ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune8f6f4d.output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -109,17 +109,3 @@ $ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune19844a.output
 #      ; windows_unicode = false
 #      }
 #  }
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/AST/AST.ml) > _build/default/CSharpMini/AST/.AST.objs/AST.ml.d
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/Parser/Parser.ml) > _build/default/CSharpMini/Parser/.Parser.objs/Parser.ml.d
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/Program.ml) > _build/default/CSharpMini/.Program.eobjs/Program.ml.d
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/AST/.AST.objs/byte -no-alias-deps -opaque -o CSharpMini/AST/.AST.objs/byte/aST.cmo -c -impl CSharpMini/AST/AST.ml)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/Parser/.Parser.objs/byte -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -no-alias-deps -opaque -o CSharpMini/Parser/.Parser.objs/byte/parser.cmo -c -impl CSharpMini/Parser/Parser.ml)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/AST/.AST.objs/native/aST.cmx -c -impl CSharpMini/AST/AST.ml)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -a -o CSharpMini/AST/AST.cmxa CSharpMini/AST/.AST.objs/native/aST.cmx)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/Parser/.Parser.objs/native/parser.cmx -c -impl CSharpMini/Parser/Parser.ml)
-> File "_none_", line 1:
-> Warning 58: no cmx file was found in path for module Opal, and its interface was not compiled with -opaque
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -a -o CSharpMini/Parser/Parser.cmxa CSharpMini/Parser/.Parser.objs/native/parser.cmx)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/.Program.eobjs/byte -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -no-alias-deps -opaque -o CSharpMini/.Program.eobjs/byte/dune__exe__Program.cmo -c -impl CSharpMini/Program.ml)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/.Program.eobjs/byte -I CSharpMini/.Program.eobjs/native -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/.Program.eobjs/native/dune__exe__Program.cmx -c -impl CSharpMini/Program.ml)
-$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -o CSharpMini/Program.exe CSharpMini/AST/AST.cmxa /home/kznts9v_1lya/.opam/opam/lib/opal/opal.cmxa CSharpMini/Parser/Parser.cmxa CSharpMini/.Program.eobjs/native/dune__exe__Program.cmx)
