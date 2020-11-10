@@ -1,0 +1,5 @@
+(executable
+ (name Program)
+ (public_name CSharpMini.Program)
+ (modules Program)
+ (libraries Parser AST))

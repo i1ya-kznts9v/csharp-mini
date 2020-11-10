@@ -1,0 +1,125 @@
+# dune build CSharpMini/Program.exe
+# OCAMLPARAM: unset
+# Workspace root: "/home/kznts9v_1lya/Education/Functional
+# programming/fp2020hw"
+$ /usr/bin/nproc > /tmp/duneb9202e.output 2> /dev/null
+# Auto-detected concurrency: 8
+# disable binary cache
+$ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune19844a.output
+# Dune context:
+#  { name = "default"
+#  ; kind = "default"
+#  ; profile = Dyn
+#  ; merlin = true
+#  ; for_host = None
+#  ; fdo_target_exe = None
+#  ; build_dir = "default"
+#  ; toplevel_path = Some External "/home/kznts9v_1lya/.opam/opam/lib/toplevel"
+#  ; ocaml_bin = External "/home/kznts9v_1lya/.opam/opam/bin"
+#  ; ocaml = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocaml"
+#  ; ocamlc = External "/home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt"
+#  ; ocamlopt = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt"
+#  ; ocamldep = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt"
+#  ; ocamlmklib =
+#      Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamlmklib.opt"
+#  ; env =
+#      map
+#        { "INSIDE_DUNE" :
+#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/default"
+#        ; "OCAMLFIND_IGNORE_DUPS_IN" :
+#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib"
+#        ; "OCAMLPATH" :
+#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib"
+#        ; "OCAMLTOP_INCLUDE_PATH" :
+#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib/toplevel"
+#        ; "OCAML_COLOR" : "always"
+#        ; "OPAMCOLOR" : "always"
+#        }
+#  ; findlib_path = [ External "/home/kznts9v_1lya/.opam/opam/lib" ]
+#  ; arch_sixtyfour = true
+#  ; natdynlink_supported = true
+#  ; supports_shared_libraries = true
+#  ; ocaml_config =
+#      { version = "4.11.1"
+#      ; standard_library_default = "/home/kznts9v_1lya/.opam/opam/lib/ocaml"
+#      ; standard_library = "/home/kznts9v_1lya/.opam/opam/lib/ocaml"
+#      ; standard_runtime = "the_standard_runtime_variable_was_deleted"
+#      ; ccomp_type = "cc"
+#      ; c_compiler = "gcc"
+#      ; ocamlc_cflags = [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-fPIC" ]
+#      ; ocamlc_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
+#      ; ocamlopt_cflags =
+#          [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-fPIC" ]
+#      ; ocamlopt_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
+#      ; bytecomp_c_compiler =
+#          [ "gcc"
+#          ; "-O2"
+#          ; "-fno-strict-aliasing"
+#          ; "-fwrapv"
+#          ; "-fPIC"
+#          ; "-D_FILE_OFFSET_BITS=64"
+#          ; "-D_REENTRANT"
+#          ]
+#      ; bytecomp_c_libraries = [ "-lm"; "-ldl"; "-lpthread" ]
+#      ; native_c_compiler =
+#          [ "gcc"
+#          ; "-O2"
+#          ; "-fno-strict-aliasing"
+#          ; "-fwrapv"
+#          ; "-fPIC"
+#          ; "-D_FILE_OFFSET_BITS=64"
+#          ; "-D_REENTRANT"
+#          ]
+#      ; native_c_libraries = [ "-lm"; "-ldl" ]
+#      ; cc_profile = []
+#      ; architecture = "amd64"
+#      ; model = "default"
+#      ; int_size = 63
+#      ; word_size = 64
+#      ; system = "linux"
+#      ; asm = [ "as" ]
+#      ; asm_cfi_supported = true
+#      ; with_frame_pointers = false
+#      ; ext_exe = ""
+#      ; ext_obj = ".o"
+#      ; ext_asm = ".s"
+#      ; ext_lib = ".a"
+#      ; ext_dll = ".so"
+#      ; os_type = "Unix"
+#      ; default_executable_name = "a.out"
+#      ; systhread_supported = true
+#      ; host = "x86_64-pc-linux-gnu"
+#      ; target = "x86_64-pc-linux-gnu"
+#      ; profiling = false
+#      ; flambda = false
+#      ; spacetime = false
+#      ; safe_string = true
+#      ; exec_magic_number = "Caml1999X028"
+#      ; cmi_magic_number = "Caml1999I028"
+#      ; cmo_magic_number = "Caml1999O028"
+#      ; cma_magic_number = "Caml1999A028"
+#      ; cmx_magic_number = "Caml1999Y028"
+#      ; cmxa_magic_number = "Caml1999Z028"
+#      ; ast_impl_magic_number = "Caml1999M028"
+#      ; ast_intf_magic_number = "Caml1999N028"
+#      ; cmxs_magic_number = "Caml1999D028"
+#      ; cmt_magic_number = "Caml1999T028"
+#      ; natdynlink_supported = true
+#      ; supports_shared_libraries = true
+#      ; windows_unicode = false
+#      }
+#  }
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/AST/AST.ml) > _build/default/CSharpMini/AST/.AST.objs/AST.ml.d
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/Parser/Parser.ml) > _build/default/CSharpMini/Parser/.Parser.objs/Parser.ml.d
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt -modules -impl CSharpMini/Program.ml) > _build/default/CSharpMini/.Program.eobjs/Program.ml.d
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/AST/.AST.objs/byte -no-alias-deps -opaque -o CSharpMini/AST/.AST.objs/byte/aST.cmo -c -impl CSharpMini/AST/AST.ml)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/Parser/.Parser.objs/byte -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -no-alias-deps -opaque -o CSharpMini/Parser/.Parser.objs/byte/parser.cmo -c -impl CSharpMini/Parser/Parser.ml)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/AST/.AST.objs/native/aST.cmx -c -impl CSharpMini/AST/AST.ml)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -a -o CSharpMini/AST/AST.cmxa CSharpMini/AST/.AST.objs/native/aST.cmx)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/Parser/.Parser.objs/native/parser.cmx -c -impl CSharpMini/Parser/Parser.ml)
+> File "_none_", line 1:
+> Warning 58: no cmx file was found in path for module Opal, and its interface was not compiled with -opaque
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -a -o CSharpMini/Parser/Parser.cmxa CSharpMini/Parser/.Parser.objs/native/parser.cmx)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -bin-annot -I CSharpMini/.Program.eobjs/byte -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -no-alias-deps -opaque -o CSharpMini/.Program.eobjs/byte/dune__exe__Program.cmo -c -impl CSharpMini/Program.ml)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -I CSharpMini/.Program.eobjs/byte -I CSharpMini/.Program.eobjs/native -I /home/kznts9v_1lya/.opam/opam/lib/opal -I CSharpMini/AST/.AST.objs/byte -I CSharpMini/AST/.AST.objs/native -I CSharpMini/Parser/.Parser.objs/byte -I CSharpMini/Parser/.Parser.objs/native -intf-suffix .ml -no-alias-deps -opaque -o CSharpMini/.Program.eobjs/native/dune__exe__Program.cmx -c -impl CSharpMini/Program.ml)
+$ (cd _build/default && /home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt -w @1..3@5..28@30..39@43@46..47@49..57@61..62-40 -strict-sequence -strict-formats -short-paths -keep-locs -g -o CSharpMini/Program.exe CSharpMini/AST/AST.cmxa /home/kznts9v_1lya/.opam/opam/lib/opal/opal.cmxa CSharpMini/Parser/Parser.cmxa CSharpMini/.Program.eobjs/native/dune__exe__Program.cmx)

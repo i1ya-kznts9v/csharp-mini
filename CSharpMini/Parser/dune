@@ -1,0 +1,4 @@
+(library
+ (name Parser)
+ (libraries AST opal)
+ (inline_tests))
