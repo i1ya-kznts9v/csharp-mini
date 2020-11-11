@@ -1,11 +1,10 @@
-# dune build CSharpMini/Program.exe
+# dune build Program.exe
 # OCAMLPARAM: unset
-# Workspace root: "/home/kznts9v_1lya/Education/Functional
-# programming/fp2020hw"
-$ /usr/bin/nproc > /tmp/dune61b949.output 2> /dev/null
+# Workspace root: /home/kznts9v_1lya/Education/Functional_programming/fp2020hw
+$ /usr/bin/nproc > /tmp/duneb41a8f.output 2> /dev/null
 # Auto-detected concurrency: 8
 # disable binary cache
-$ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune8f6f4d.output
+$ /home/kznts9v_1lya/.opam/4.10.1/bin/ocamlc.opt -config > /tmp/dunec06014.output
 # Dune context:
 #  { name = "default"
 #  ; kind = "default"
@@ -14,42 +13,42 @@ $ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune8f6f4d.output
 #  ; for_host = None
 #  ; fdo_target_exe = None
 #  ; build_dir = "default"
-#  ; toplevel_path = Some External "/home/kznts9v_1lya/.opam/opam/lib/toplevel"
-#  ; ocaml_bin = External "/home/kznts9v_1lya/.opam/opam/bin"
-#  ; ocaml = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocaml"
-#  ; ocamlc = External "/home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt"
-#  ; ocamlopt = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamlopt.opt"
-#  ; ocamldep = Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamldep.opt"
+#  ; toplevel_path =
+#      Some External "/home/kznts9v_1lya/.opam/4.10.1/lib/toplevel"
+#  ; ocaml_bin = External "/home/kznts9v_1lya/.opam/4.10.1/bin"
+#  ; ocaml = Ok External "/home/kznts9v_1lya/.opam/4.10.1/bin/ocaml"
+#  ; ocamlc = External "/home/kznts9v_1lya/.opam/4.10.1/bin/ocamlc.opt"
+#  ; ocamlopt = Ok External "/home/kznts9v_1lya/.opam/4.10.1/bin/ocamlopt.opt"
+#  ; ocamldep = Ok External "/home/kznts9v_1lya/.opam/4.10.1/bin/ocamldep.opt"
 #  ; ocamlmklib =
-#      Ok External "/home/kznts9v_1lya/.opam/opam/bin/ocamlmklib.opt"
+#      Ok External "/home/kznts9v_1lya/.opam/4.10.1/bin/ocamlmklib.opt"
 #  ; env =
 #      map
 #        { "INSIDE_DUNE" :
-#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/default"
+#            "/home/kznts9v_1lya/Education/Functional_programming/fp2020hw/_build/default"
 #        ; "OCAMLFIND_IGNORE_DUPS_IN" :
-#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib"
+#            "/home/kznts9v_1lya/Education/Functional_programming/fp2020hw/_build/install/default/lib"
 #        ; "OCAMLPATH" :
-#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib"
+#            "/home/kznts9v_1lya/Education/Functional_programming/fp2020hw/_build/install/default/lib"
 #        ; "OCAMLTOP_INCLUDE_PATH" :
-#            "/home/kznts9v_1lya/Education/Functional programming/fp2020hw/_build/install/default/lib/toplevel"
+#            "/home/kznts9v_1lya/Education/Functional_programming/fp2020hw/_build/install/default/lib/toplevel"
 #        ; "OCAML_COLOR" : "always"
 #        ; "OPAMCOLOR" : "always"
 #        }
-#  ; findlib_path = [ External "/home/kznts9v_1lya/.opam/opam/lib" ]
+#  ; findlib_path = [ External "/home/kznts9v_1lya/.opam/4.10.1/lib" ]
 #  ; arch_sixtyfour = true
 #  ; natdynlink_supported = true
 #  ; supports_shared_libraries = true
 #  ; ocaml_config =
-#      { version = "4.11.1"
-#      ; standard_library_default = "/home/kznts9v_1lya/.opam/opam/lib/ocaml"
-#      ; standard_library = "/home/kznts9v_1lya/.opam/opam/lib/ocaml"
+#      { version = "4.10.1"
+#      ; standard_library_default = "/home/kznts9v_1lya/.opam/4.10.1/lib/ocaml"
+#      ; standard_library = "/home/kznts9v_1lya/.opam/4.10.1/lib/ocaml"
 #      ; standard_runtime = "the_standard_runtime_variable_was_deleted"
 #      ; ccomp_type = "cc"
 #      ; c_compiler = "gcc"
 #      ; ocamlc_cflags = [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-fPIC" ]
 #      ; ocamlc_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
-#      ; ocamlopt_cflags =
-#          [ "-O2"; "-fno-strict-aliasing"; "-fwrapv"; "-fPIC" ]
+#      ; ocamlopt_cflags = [ "-O2"; "-fno-strict-aliasing"; "-fwrapv" ]
 #      ; ocamlopt_cppflags = [ "-D_FILE_OFFSET_BITS=64"; "-D_REENTRANT" ]
 #      ; bytecomp_c_compiler =
 #          [ "gcc"
@@ -66,7 +65,6 @@ $ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune8f6f4d.output
 #          ; "-O2"
 #          ; "-fno-strict-aliasing"
 #          ; "-fwrapv"
-#          ; "-fPIC"
 #          ; "-D_FILE_OFFSET_BITS=64"
 #          ; "-D_REENTRANT"
 #          ]
@@ -94,16 +92,16 @@ $ /home/kznts9v_1lya/.opam/opam/bin/ocamlc.opt -config > /tmp/dune8f6f4d.output
 #      ; flambda = false
 #      ; spacetime = false
 #      ; safe_string = true
-#      ; exec_magic_number = "Caml1999X028"
-#      ; cmi_magic_number = "Caml1999I028"
-#      ; cmo_magic_number = "Caml1999O028"
-#      ; cma_magic_number = "Caml1999A028"
-#      ; cmx_magic_number = "Caml1999Y028"
-#      ; cmxa_magic_number = "Caml1999Z028"
-#      ; ast_impl_magic_number = "Caml1999M028"
-#      ; ast_intf_magic_number = "Caml1999N028"
-#      ; cmxs_magic_number = "Caml1999D028"
-#      ; cmt_magic_number = "Caml1999T028"
+#      ; exec_magic_number = "Caml1999X027"
+#      ; cmi_magic_number = "Caml1999I027"
+#      ; cmo_magic_number = "Caml1999O027"
+#      ; cma_magic_number = "Caml1999A027"
+#      ; cmx_magic_number = "Caml1999Y027"
+#      ; cmxa_magic_number = "Caml1999Z027"
+#      ; ast_impl_magic_number = "Caml1999M027"
+#      ; ast_intf_magic_number = "Caml1999N027"
+#      ; cmxs_magic_number = "Caml1999D027"
+#      ; cmt_magic_number = "Caml1999T027"
 #      ; natdynlink_supported = true
 #      ; supports_shared_libraries = true
 #      ; windows_unicode = false
