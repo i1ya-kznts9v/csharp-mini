@@ -1,3 +1,3 @@
 (library
- (name AST)
+ (name ast)
  (inline_tests))
