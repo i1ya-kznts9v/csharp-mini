@@ -1,0 +1,7 @@
+(executable
+ (name REPL)
+ (public_name CSharpMini.Repl)
+ (modules REPL))
+
+(cram
+ (deps demos/demoFirst.exe))

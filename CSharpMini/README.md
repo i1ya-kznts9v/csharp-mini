@@ -1,10 +1,10 @@
-### An implementaion of Lambda mini-language
+### An implementaion of CSharp mini-language
 
 This is a homework for functional programming course.
 
 License: LGPL
 
-Author: Vasy Pupkin, vasya@pupkin.com
+Author: Kuznetsov Ilya Alexandrovich, kuznetsov.ilya.alexandrovich@gmail.com
 
 Features done:
 
