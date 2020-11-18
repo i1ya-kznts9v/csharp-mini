@@ -1,108 +1,179 @@
 open Opal
 open Ast
 
-let parens = between (token "(") (token ")")
-let brackets = between (token "[") (token "]")
+(*Check fullness*)
+let reserved =
+  [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
+  ; "int"; "bool"; "string"; "void"; "char"; "Null"; "new"; "this"; "base"
+  ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
+  ; "continue"; "brake"; "class" ]
 
+(* let parens = between (token "(") (token ")") *)
+(* let brackets = between (token "[") (token "]") *)
 (*let braces = between (token "{") (token "}")*)
 
-let listNoOption lst = match lst with Some x -> x | None -> []
-let listWithOption lst = match lst with [] -> None | x -> Some x
+let digits = spaces >> many1 digit => implode
+let integer = digits => int_of_string
+let list_no_option list = match list with Some x -> x | None -> []
+let list_with_option list = match list with [] -> None | x -> Some x
+
+let modifier =
+  choice
+    [ token "public" >> return Public; token "static" >> return Static
+    ; token "const" >> return Const; token "virtual" >> return Virtual
+    ; token "override" >> return Override; token "abstract" >> return Abstract
+    ]
 
 module Expression = struct
+  let null = token "Null" >> return Null
+
+  let%test _ = parse null (LazyStream.of_string "          Null") = Some Null
+
   let base = token "base" >> return Base
+
+  let%test _ = parse base (LazyStream.of_string "      base") = Some Base
+
   let this = token "this" >> return This
 
-  (*TODO: check fullness*)
-  let reserved =
-    [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
-    ; "int"; "bool"; "string"; "void"; "char"; "Null"; "new"; "this"; "base"
-    ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do" ]
+  let%test _ = parse this (LazyStream.of_string "         this") = Some This
 
-  let addOp = token "+" >> return (fun x y -> NumExpr (Add (x, y)))
-  let subOp = token "-" >> return (fun x y -> NumExpr (Sub (x, y)))
-  let multOp = token "*" >> return (fun x y -> NumExpr (Mult (x, y)))
-  let divOp = token "/" >> return (fun x y -> NumExpr (Div (x, y)))
-  let modOp = token "%" >> return (fun x y -> NumExpr (Mod (x, y)))
-  let orOp = token "||" >> return (fun x y -> LogExpr (Or (x, y)))
-  let andOp = token "&&" >> return (fun x y -> LogExpr (And (x, y)))
-  let lessOp = token "<" >> return (fun x y -> CompExpr (Less (x, y)))
-  let moreOp = token ">" >> return (fun x y -> CompExpr (More (x, y)))
+  let int_value = integer >>= fun i -> return (Value (VInt i))
 
-  let lessOrEqualOp =
-    token "<=" >> return (fun x y -> CompExpr (LessOrEqual (x, y)))
+  let%test _ =
+    parse int_value (LazyStream.of_string "            19012001")
+    = Some (Value (VInt 19012001))
 
-  let moreOrEqualOp =
-    token ">=" >> return (fun x y -> CompExpr (MoreOrEqual (x, y)))
+  (* let%test _ =
+     parse int_value (LazyStream.of_string "            19012aa1") = None *)
 
-  let equalOp = token "==" >> return (fun x y -> CompExpr (Equal (x, y)))
-  let notEqualOp = token "!=" >> return (fun x y -> CompExpr (NotEqual (x, y)))
+  let string_value =
+    let string_of_chars chars =
+      let buffer = Buffer.create 16 in
+      List.iter (Buffer.add_char buffer) chars ;
+      Buffer.contents buffer in
+    token "\""
+    >> many (satisfy (fun c -> c <> '\"'))
+    >>= fun list ->
+    token "\"" >> return (Value (VString (string_of_chars list)))
 
-  let identifier =
+  let%test _ =
+    parse string_value (LazyStream.of_string "       \"Hello world!\"")
+    = Some (Value (VString "Hello world!"))
+
+  let false_value = token "false" >> return (Value (VBool false))
+  let true_value = token "true" >> return (Value (VBool true))
+
+  let ident =
     spaces >> letter <~> many alpha_num => implode
-    >>= function
-    | x when List.mem x reserved -> mzero
-    | x -> return x => fun x -> Identifier x
+    >>= function s when List.mem s reserved -> mzero | s -> return s
 
-  let nullValue = token "Null" >> return (Value VNull)
-  let falseValue = token "false" >> return (Value (VBool false))
-  let trueValue = token "true" >> return (Value (VBool true))
-  let digits = spaces >> many1 digit => implode
-  let integer = digits => int_of_string
-  let intValue = integer => fun x -> Value (VInt x)
+  let identifier = ident >>= fun s -> return (Identifier s)
 
-  (*TODO: add smth*)
-  let atomExpr =
-    identifier <|> intValue <|> falseValue <|> trueValue <|> nullValue
+  let%test _ =
+    parse identifier (LazyStream.of_string "       JetBrains")
+    = Some (Identifier "JetBrains")
 
-  (*In ascending order of priority of operations*)
-  let rec expression input = numExpr input
-  and numExpr input = (chainl1 andExpr orOp) input
-  and andExpr input = (chainl1 compExpr andOp) input
+  let%test _ = parse identifier (LazyStream.of_string "     abstract") = None
+  let%test _ = parse identifier (LazyStream.of_string "   1lya") = None
 
-  and compExpr input =
-    (chainl1 addExpr
-       ( lessOp <|> moreOp <|> lessOrEqualOp <|> moreOrEqualOp <|> equalOp
-       <|> notEqualOp ))
-      input
+  let add_op = token "+" >> return (fun x y -> Add (x, y))
+  let sub_op = token "-" >> return (fun x y -> Sub (x, y))
+  let mult_op = token "*" >> return (fun x y -> Mult (x, y))
+  let div_op = token "/" >> return (fun x y -> Div (x, y))
+  let mod_op = token "%" >> return (fun x y -> Mod (x, y))
+  let or_op = token "||" >> return (fun x y -> Or (x, y))
+  let and_op = token "&&" >> return (fun x y -> And (x, y))
+  let less_op = token "<" >> return (fun x y -> Less (x, y))
+  let more_op = token ">" >> return (fun x y -> More (x, y))
+  let less_or_equal_op = token "<=" >> return (fun x y -> LessOrEqual (x, y))
+  let more_or_equal_op = token ">=" >> return (fun x y -> MoreOrEqual (x, y))
+  let equal_op = token "==" >> return (fun x y -> Equal (x, y))
+  let not_equal_op = token "!=" >> return (fun x y -> NotEqual (x, y))
 
-  and addExpr input = (chainl1 multExpr (addOp <|> subOp)) input
-  and multExpr input = (chainl1 unarExpr (multOp <|> divOp <|> modOp)) input
+  let atomaric =
+    choice [identifier; int_value; string_value; true_value; false_value; null]
 
-  (*TODO: Add inc dec*)
-  and unarExpr input =
+  let%test _ =
+    parse atomaric (LazyStream.of_string "    false")
+    = Some (Value (VBool false))
+
+  let define_type_with_array =
+    let type_or_array_type t =
+      many (token "[]")
+      >>= fun brackets_list ->
+      match List.length brackets_list with
+      | 0 -> return t
+      | 1 when t != TVoid -> return (TArray t)
+      | _ -> mzero in
     choice
-      [ (token "!" >> lexeme primExpr >>= fun s -> return (LogExpr (Not s)))
-      ; ( token "-" >> lexeme primExpr
-        >>= fun x -> return (NumExpr (Sub (Value (VInt 0), x))) ); primExpr ]
+      [ token "int" >> type_or_array_type TInt
+      ; token "string" >> type_or_array_type TString
+      ; token "object" >> type_or_array_type TObject
+      ; token "void" >> type_or_array_type TVoid
+      ; (ident >>= fun class_name -> type_or_array_type (TClass class_name)) ]
+
+  let%test _ =
+    parse define_type_with_array (LazyStream.of_string "   string[][][]") = None
+
+  let%test _ =
+    parse define_type_with_array (LazyStream.of_string "   void[]") = None
+
+  let%test _ =
+    parse define_type_with_array (LazyStream.of_string "   void") = Some TVoid
+
+  let%test _ =
+    parse define_type_with_array (LazyStream.of_string "   int[]")
+    = Some (TArray TInt)
+
+  let%test _ =
+    parse define_type_with_array (LazyStream.of_string "   JetBrains[]")
+    = Some (TArray (TClass "JetBrains"))
+
+  let define_type =
+    choice
+      [ token "int" >> return TInt; token "string" >> return TString
+      ; token "object" >> return TObject; token "void" >> return TVoid
+      ; (ident >>= fun class_name -> return (TClass class_name)) ]
+
+  let%test _ = parse define_type (LazyStream.of_string " object") = Some TObject
+
+  let%test _ =
+    parse define_type (LazyStream.of_string "   Ilya") = Some (TClass "Ilya")
+
+  (* Functions below this point are arranged in ascending order of priority,
+  but inside this functions, priorities are in descending order *)
+  let rec expression input = or_expr input
+  and or_expr input = (chainl1 and_expr or_op) input
+  and and_expr input = (chainl1 comparison_expr and_op) input
+
+  and comparison_expr input =
+    (chainl1 add_sub_expr
+       ( less_or_equal_op <|> more_or_equal_op <|> less_op <|> more_op
+       <|> equal_op <|> not_equal_op ))
       input
 
-  (*TODO: not working on a.b + 2*)
-  and primExpr input =
-    ( parens expression <|> accessByPoint <|> arrayAccess <|> callMethod
-    <|> atomExpr )
-      input
+  and add_sub_expr input = (chainl1 mult_div_mod_expr (add_op <|> sub_op)) input
 
-  and arrayAccess input =
-    ( callMethod <|> identifier
-    >>= fun aName ->
-    many1 (brackets expression)
-    >>= fun aIndexes -> return (ArrayAccess (aName, aIndexes)) )
-      input
+  and mult_div_mod_expr input =
+    (chainl1 unaric_expr (mult_op <|> div_op <|> mod_op)) input
 
-  and accessByPoint input =
-    ( arrayAccess <|> callMethod <|> identifier
-    >>= fun pName ->
-    token "." >> lexeme expression
-    >>= fun pCall -> return (AccessByPoint (pName, pCall)) )
+  and unaric_expr input =
+    choice
+      [(token "!" >> lexeme primary_expr >>= fun e -> return (Not e));
+       (token "-" >> lexeme primary_expr >>= fun e -> return (Sub(Value(VInt 0), e)));
+       (token "++" >> lexeme primary_expr >>= fun e -> return(PrefInc e));
+       (token "--" >> lexeme primary_expr >>= fun e -> return(PrefDec e));
+       (lexeme primary_expr >>= fun e -> token "++" >> return(PostInc e));
+       (lexeme primary_expr >>= fun e -> token "--" >> return(PostDec e));
+       primary_expr;]
       input
-
-  and splitByComma input = sep_by expression (token ",") input
-
-  and callMethod input =
-    ( identifier
-    >>= fun mName ->
-    token "(" >> splitByComma
-    >>= fun mArgs -> token ")" >> return (CallMethod (mName, mArgs)) )
-      input
+  and primary_expr input = 
+  (*Priority location is over*)
+  and array_access input = 
+  and access_by_point input = 
+  and split_by_comma input = sep_by expression (token ",") input
+  and call_method input = 
+  and class_decl input = 
+  and array_decl input = 
+  and assign input = 
 end

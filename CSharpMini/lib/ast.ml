@@ -22,6 +22,7 @@
   ; c_classes: cs_class list } *)
 
 type cs_modifier = Static | Public | Const | Virtual | Override | Abstract
+[@@deriving show]
 
 type cs_type =
   | TInt
