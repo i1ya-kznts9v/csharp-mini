@@ -69,8 +69,8 @@ type cs_expression =
   | Null
   | Value of cs_value
   | Identifier of string
-  | ClassDecl of string * cs_expression list
-  | ArrayDecl of cs_type * cs_expression option
+  | ClassCreation of cs_expression * cs_expression list
+  | ArrayCreation of cs_type * cs_expression
   | CallMethod of cs_expression * cs_expression list
   | AccessByPoint of cs_expression * cs_expression
   | ArrayAccess of cs_expression * cs_expression

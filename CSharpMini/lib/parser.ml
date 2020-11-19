@@ -8,8 +8,10 @@ let reserved =
   ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
   ; "continue"; "brake"; "class" ]
 
-(* let parens = between (token "(") (token ")") *)
+let parens = between (token "(") (token ")")
+
 (* let brackets = between (token "[") (token "]") *)
+
 (*let braces = between (token "{") (token "}")*)
 
 let digits = spaces >> many1 digit => implode
@@ -97,38 +99,6 @@ module Expression = struct
     parse atomaric (LazyStream.of_string "    false")
     = Some (Value (VBool false))
 
-  let define_type_with_array =
-    let type_or_array_type t =
-      many (token "[]")
-      >>= fun brackets_list ->
-      match List.length brackets_list with
-      | 0 -> return t
-      | 1 when t != TVoid -> return (TArray t)
-      | _ -> mzero in
-    choice
-      [ token "int" >> type_or_array_type TInt
-      ; token "string" >> type_or_array_type TString
-      ; token "object" >> type_or_array_type TObject
-      ; token "void" >> type_or_array_type TVoid
-      ; (ident >>= fun class_name -> type_or_array_type (TClass class_name)) ]
-
-  let%test _ =
-    parse define_type_with_array (LazyStream.of_string "   string[][][]") = None
-
-  let%test _ =
-    parse define_type_with_array (LazyStream.of_string "   void[]") = None
-
-  let%test _ =
-    parse define_type_with_array (LazyStream.of_string "   void") = Some TVoid
-
-  let%test _ =
-    parse define_type_with_array (LazyStream.of_string "   int[]")
-    = Some (TArray TInt)
-
-  let%test _ =
-    parse define_type_with_array (LazyStream.of_string "   JetBrains[]")
-    = Some (TArray (TClass "JetBrains"))
-
   let define_type =
     choice
       [ token "int" >> return TInt; token "string" >> return TString
@@ -140,8 +110,36 @@ module Expression = struct
   let%test _ =
     parse define_type (LazyStream.of_string "   Ilya") = Some (TClass "Ilya")
 
+  let define_array_type =
+    let array_type t =
+      token "["
+      >> many (token ",")
+      >>= fun dim_list ->
+      token "]"
+      >>
+      match List.length dim_list with
+      | 0 when t != TVoid -> return (TArray t)
+      | _ -> mzero in
+    choice
+      [ token "int" >> array_type TInt; token "string" >> array_type TString
+      ; token "object" >> array_type TObject; token "void" >> array_type TVoid
+      ; (ident >>= fun class_name -> array_type (TClass class_name)) ]
+
+  let%test _ =
+    parse define_array_type (LazyStream.of_string "   string[,,]") = None
+
+  let%test _ = parse define_array_type (LazyStream.of_string "   void[]") = None
+
+  let%test _ =
+    parse define_array_type (LazyStream.of_string "   int[]")
+    = Some (TArray TInt)
+
+  let%test _ =
+    parse define_array_type (LazyStream.of_string "   JetBrains[]")
+    = Some (TArray (TClass "JetBrains"))
+
   (* Functions below this point are arranged in ascending order of priority,
-  but inside this functions, priorities are in descending order *)
+     but inside this functions, priorities are in descending order *)
   let rec expression input = or_expr input
   and or_expr input = (chainl1 and_expr or_op) input
   and and_expr input = (chainl1 comparison_expr and_op) input
@@ -159,21 +157,92 @@ module Expression = struct
 
   and unaric_expr input =
     choice
-      [(token "!" >> lexeme primary_expr >>= fun e -> return (Not e));
-       (token "-" >> lexeme primary_expr >>= fun e -> return (Sub(Value(VInt 0), e)));
-       (token "++" >> lexeme primary_expr >>= fun e -> return(PrefInc e));
-       (token "--" >> lexeme primary_expr >>= fun e -> return(PrefDec e));
-       (lexeme primary_expr >>= fun e -> token "++" >> return(PostInc e));
-       (lexeme primary_expr >>= fun e -> token "--" >> return(PostDec e));
-       primary_expr;]
+      [ (token "!" >> lexeme primary_expr >>= fun e -> return (Not e))
+      ; ( token "-" >> lexeme primary_expr
+        >>= fun e -> return (Sub (Value (VInt 0), e)) )
+      ; (token "++" >> lexeme primary_expr >>= fun e -> return (PrefInc e))
+      ; (token "--" >> lexeme primary_expr >>= fun e -> return (PrefDec e))
+      ; (lexeme primary_expr >>= fun e -> token "++" >> return (PostInc e))
+      ; (lexeme primary_expr >>= fun e -> token "--" >> return (PostDec e))
+      ; primary_expr ]
       input
-  and primary_expr input = 
-  (*Priority location is over*)
-  and array_access input = 
-  and access_by_point input = 
+
+  and primary_expr input =
+    ( class_creation <|> array_creation <|> assign <|> access_by_point
+    <|> array_access <|> call_method <|> this <|> base <|> parens expression
+    <|> atomaric )
+      input
+
+  and array_access input =
+    ( this <|> parens array_creation <|> base <|> call_method <|> identifier
+    >>= fun array_name ->
+    define_array_index >>= fun index -> return (ArrayAccess (array_name, index))
+    )
+      input
+
+  and access_by_point input =
+    let fold_accesses acc el =
+      match el with
+      | ArrayAccess (identifier, index) ->
+          ArrayAccess (AccessByPoint (acc, identifier), index)
+      | other -> AccessByPoint (acc, other) in
+    let called_parse =
+      this <|> base <|> parens class_creation <|> array_access <|> call_method
+      <|> identifier in
+    ( called_parse
+    >>= fun head ->
+    many1 (token "." >> called_parse)
+    => fun tl -> List.fold_left fold_accesses head tl )
+      input
+
   and split_by_comma input = sep_by expression (token ",") input
-  and call_method input = 
-  and class_decl input = 
-  and array_decl input = 
-  and assign input = 
+
+  and define_array_index input =
+    ( token "[" >> expression
+    >>= fun index ->
+    many (token ",")
+    >>= fun commas ->
+    match List.length commas with
+    | 0 -> token "]" >> return index
+    | _ -> token "]" >> mzero )
+      input
+
+  and call_method input =
+    ( identifier <|> this <|> base
+    >>= fun method_name ->
+    token "(" >> split_by_comma
+    >>= fun list_expr ->
+    token ")" >> return (CallMethod (method_name, list_expr)) )
+      input
+
+  and class_creation input =
+    ( token "new" >> identifier
+    >>= fun class_name ->
+    token "(" >> split_by_comma
+    >>= fun list_expr ->
+    token ")" >> return (ClassCreation (class_name, list_expr)) )
+      input
+
+  and array_creation input =
+    ( token "new" >> define_type
+    >>= fun array_type ->
+    define_array_index
+    >>= fun array_size -> return (ArrayCreation (array_type, array_size)) )
+      input
+
+  and assign input =
+    let left = access_by_point <|> array_access <|> call_method <|> identifier in
+    ( left
+    >>= fun left ->
+    token "=" >> expression >>= fun right -> return (Assign (left, right)) )
+      input
+
+  (*Priority location is over*)
+
+  let%test _ =
+    parse define_array_index (LazyStream.of_string " [ 14   ]")
+    = Some (Value (VInt 14))
+
+  let%test _ =
+    parse define_array_index (LazyStream.of_string " [ 14, 19 , 99 ]") = None
 end
