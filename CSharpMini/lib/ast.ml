@@ -1,26 +1,3 @@
-(*type cs_exception = {e_name: cs_type; e_message: string}*)
-
-(* type cs_variable =
-  { v_modifiers: cs_modifier list
-  ; v_type: cs_type
-  ; v_name: string
-  ; v_value: cs_value option } *)
-
-(* type cs_method =
-   { m_modifiers: cs_modifier list
-   ; m_type: cs_type
-   ; m_name: string
-   ; m_args: cs_expression list
-   ; m_body: cs_statement list } *)
-
-(* type cs_class =
-  { c_modifiers: cs_modifier list
-  ; c_name: string
-  ; c_parent: cs_class option
-  ; c_fields: cs_variable list
-  ; c_methods: cs_method list
-  ; c_classes: cs_class list } *)
-
 type cs_modifier = Static | Public | Const | Virtual | Override | Abstract
 [@@deriving show]
 
@@ -69,8 +46,9 @@ type cs_expression =
   | Null
   | Value of cs_value
   | Identifier of string
-  | ClassCreation of cs_expression * cs_expression list
-  | ArrayCreation of cs_type * cs_expression
+  | ClassCreation of string * cs_expression list
+  | ArrayCreationWithSize of cs_type * cs_expression
+  | ArrayCreationWithElements of cs_type * cs_expression list
   | CallMethod of cs_expression * cs_expression list
   | AccessByPoint of cs_expression * cs_expression
   | ArrayAccess of cs_expression * cs_expression
@@ -81,12 +59,12 @@ and cs_statement =
   | Expression of cs_expression
   | StatementBlock of cs_statement list
   | If of cs_expression * cs_statement * cs_statement option
-  | While of cs_expression * cs_statement (*option*)
+  | While of cs_expression * cs_statement
   | For of
       cs_statement option
       * cs_expression option
       * cs_expression list
-      * cs_statement (*option*)
+      * cs_statement
   | Break
   | Continue
   | Return of cs_expression option

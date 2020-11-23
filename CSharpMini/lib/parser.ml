@@ -4,16 +4,14 @@ open Ast
 (*Check fullness*)
 let reserved =
   [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
-  ; "int"; "bool"; "string"; "void"; "char"; "Null"; "new"; "this"; "base"
+  ; "int"; "bool"; "string"; "void"; "char"; "null"; "new"; "this"; "base"
   ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
   ; "continue"; "brake"; "class" ]
 
 let parens = between (token "(") (token ")")
+let braces = between (token "{") (token "}")
 
 (* let brackets = between (token "[") (token "]") *)
-
-(*let braces = between (token "{") (token "}")*)
-
 let digits = spaces >> many1 digit => implode
 let integer = digits => int_of_string
 let list_no_option list = match list with Some x -> x | None -> []
@@ -27,9 +25,9 @@ let modifier =
     ]
 
 module Expression = struct
-  let null = token "Null" >> return Null
+  let null = token "null" >> return Null
 
-  let%test _ = parse null (LazyStream.of_string "          Null") = Some Null
+  let%test _ = parse null (LazyStream.of_string "          null") = Some Null
 
   let base = token "base" >> return Base
 
@@ -99,43 +97,53 @@ module Expression = struct
     parse atomaric (LazyStream.of_string "    false")
     = Some (Value (VBool false))
 
-  let define_type =
+  (*let define_type =
     choice
       [ token "int" >> return TInt; token "string" >> return TString
       ; token "object" >> return TObject; token "void" >> return TVoid
-      ; (ident >>= fun class_name -> return (TClass class_name)) ]
+      ; (ident >>= fun class_name -> return (TClass class_name)) ]*)
+
+  let define_type =
+    let check_array t =
+      option ' ' (exactly '[')
+      >>= fun bracket ->
+      match bracket with
+      | '[' -> (
+          many (token ",")
+          >>= fun dim_list ->
+          token "]"
+          >>
+          match List.length dim_list with
+          | 0 when t != TVoid -> return (Some true)
+          | _ -> return (Some false) )
+      | _ -> return None in
+    let type_decision t =
+      check_array t
+      >>= fun result ->
+      match result with
+      | Some true -> return (TArray t)
+      | Some false -> mzero
+      | None -> return t in
+    choice
+      [ token "int" >> type_decision TInt
+      ; token "string" >> type_decision TString
+      ; token "object" >> type_decision TObject
+      ; token "void" >> type_decision TVoid
+      ; (ident >>= fun class_name -> type_decision (TClass class_name)) ]
 
   let%test _ = parse define_type (LazyStream.of_string " object") = Some TObject
 
   let%test _ =
-    parse define_type (LazyStream.of_string "   Ilya") = Some (TClass "Ilya")
+    parse define_type (LazyStream.of_string "   Ilya  ") = Some (TClass "Ilya")
 
-  let define_array_type =
-    let array_type t =
-      token "["
-      >> many (token ",")
-      >>= fun dim_list ->
-      token "]"
-      >>
-      match List.length dim_list with
-      | 0 when t != TVoid -> return (TArray t)
-      | _ -> mzero in
-    choice
-      [ token "int" >> array_type TInt; token "string" >> array_type TString
-      ; token "object" >> array_type TObject; token "void" >> array_type TVoid
-      ; (ident >>= fun class_name -> array_type (TClass class_name)) ]
+  let%test _ = parse define_type (LazyStream.of_string "   string[,,]") = None
+  let%test _ = parse define_type (LazyStream.of_string "   void[]") = None
 
   let%test _ =
-    parse define_array_type (LazyStream.of_string "   string[,,]") = None
-
-  let%test _ = parse define_array_type (LazyStream.of_string "   void[]") = None
+    parse define_type (LazyStream.of_string "   int[]") = Some (TArray TInt)
 
   let%test _ =
-    parse define_array_type (LazyStream.of_string "   int[]")
-    = Some (TArray TInt)
-
-  let%test _ =
-    parse define_array_type (LazyStream.of_string "   JetBrains[]")
+    parse define_type (LazyStream.of_string "   JetBrains[]   ")
     = Some (TArray (TClass "JetBrains"))
 
   (* Functions below this point are arranged in ascending order of priority,
@@ -216,7 +224,7 @@ module Expression = struct
       input
 
   and class_creation input =
-    ( token "new" >> identifier
+    ( token "new" >> ident
     >>= fun class_name ->
     token "(" >> split_by_comma
     >>= fun list_expr ->
@@ -226,8 +234,14 @@ module Expression = struct
   and array_creation input =
     ( token "new" >> define_type
     >>= fun array_type ->
-    define_array_index
-    >>= fun array_size -> return (ArrayCreation (array_type, array_size)) )
+    choice
+      [ ( token "[]" >> token "{"
+        >> sep_by1 expression (token ",")
+        >>= fun elements_list ->
+        return (ArrayCreationWithElements (array_type, elements_list)) )
+      ; ( define_array_index
+        >>= fun array_size ->
+        return (ArrayCreationWithSize (array_type, array_size)) ) ] )
       input
 
   and assign input =
@@ -245,4 +259,91 @@ module Expression = struct
 
   let%test _ =
     parse define_array_index (LazyStream.of_string " [ 14, 19 , 99 ]") = None
+end
+
+module Statement = struct
+  open Expression
+
+  let break_stat = token "break" >> token ";" >> return Break
+
+  let%test _ = parse break_stat (LazyStream.of_string "break;") = Some Break
+
+  let continue_stat = token "continue" >> token ";" >> return Continue
+
+  let%test _ =
+    parse continue_stat (LazyStream.of_string "continue;") = Some Continue
+
+  let return_stat =
+    token "return"
+    >> choice
+         [ (expression >>= fun ret -> token ";" >> return (Return (Some ret)))
+         ; token ";" >> return (Return None) ]
+
+  let%test _ =
+    parse return_stat (LazyStream.of_string "return;") = Some (Return None)
+
+  let%test _ =
+    parse return_stat (LazyStream.of_string "return 0;")
+    = Some (Return (Some (Value (VInt 0))))
+
+  let%test _ =
+    parse return_stat (LazyStream.of_string "return x >= y;")
+    = Some (Return (Some (MoreOrEqual (Identifier "x", Identifier "y"))))
+
+  let expression_stat =
+    expression >>= fun expr -> token ";" >> return (Expression expr)
+
+  let%test _ =
+    parse expression_stat (LazyStream.of_string "Call();")
+    = Some (Expression (CallMethod (Identifier "Call", [])))
+
+  let%test _ =
+    parse expression_stat (LazyStream.of_string "--m;")
+    = Some (Expression (PrefDec (Identifier "m")))
+
+  let rec statement input =
+    choice
+      [ variable_decl; break_stat; continue_stat; return_stat; if_stat
+      ; while_stat; for_stat; throw_stat; expression_stat; statement_block ]
+      input
+
+  and if_stat input =
+    ( token "if" >> parens expression
+    >>= fun condition ->
+    statement
+    >>= fun if_body ->
+    choice
+      [ ( token "else" >> statement
+        >>= fun else_body -> return (If (condition, if_body, Some else_body)) )
+      ; return (If (condition, if_body, None)) ] )
+      input
+
+  and statement_block input =
+    ( braces (sep_by statement spaces)
+    >>= fun block_stat -> return (StatementBlock block_stat) )
+      input
+
+  and while_stat input =
+    ( token "while" >> parens expression
+    >>= fun condition ->
+    statement >>= fun while_body -> return (While (condition, while_body)) )
+      input
+
+  and variable_decl input =
+    let identifier_and_value =
+      identifier
+      >>= fun variable_name ->
+      token "=" >> expression
+      >>= (fun variable_value -> return (variable_name, Some variable_value))
+      <|> return (variable_name, None) in
+    ( define_type
+    >>= fun variable_type ->
+    sep_by1 identifier_and_value (token ",")
+    >>= fun variable_decl_list ->
+    token ";" >> return (VariableDecl (variable_type, variable_decl_list)) )
+      input
+
+  (*and for_stat input =*)
+  and throw_stat =
+    token "throw" >> expression >>= fun except -> return (Throw except)
 end

@@ -1,7 +1,8 @@
 (env
  (dev
   (flags
-   (:standard -warn-error -A -w -26))))
+   (:standard -warn-error -A -w -26)
+   (-short-paths))))
 
 (library
  (name csharpmini_lib)
