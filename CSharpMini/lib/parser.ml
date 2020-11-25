@@ -224,7 +224,7 @@ module Expression = struct
       input
 
   and class_creation input =
-    ( token "new" >> ident
+    ( token "new" >> identifier
     >>= fun class_name ->
     token "(" >> split_by_comma
     >>= fun list_expr ->
@@ -366,21 +366,23 @@ end
 let parameter =
   Expression.define_type
   >>= fun parameter_type ->
-  Expression.ident
+  Expression.identifier
   >>= fun parameter_identifier -> return (parameter_type, parameter_identifier)
 
 let%test _ =
   parse
     (sep_by parameter (token ","))
     (LazyStream.of_string "int a, string b, object o")
-  = Some [(TInt, "a"); (TString, "b"); (TObject, "o")]
+  = Some
+      [ (TInt, Identifier "a"); (TString, Identifier "b")
+      ; (TObject, Identifier "o") ]
 
 let method_decl =
   many modifier
   >>= fun method_modifier_list ->
   Expression.define_type
   >>= fun method_type ->
-  Expression.ident
+  Expression.identifier
   >>= fun method_name ->
   token "("
   >> sep_by parameter (token ",")
@@ -411,8 +413,8 @@ let%test _ =
       (Method
          ( [Public]
          , TInt
-         , "Sum"
-         , [(TInt, "a"); (TString, "b")]
+         , Identifier "Sum"
+         , [(TInt, Identifier "a"); (TString, Identifier "b")]
          , Some (StatementBlock []) ))
 
 let%test _ =
@@ -420,12 +422,16 @@ let%test _ =
     (LazyStream.of_string "public abstract int Sum(int a, string b);")
   = Some
       (Method
-         ([Public; Abstract], TInt, "Sum", [(TInt, "a"); (TString, "b")], None))
+         ( [Public; Abstract]
+         , TInt
+         , Identifier "Sum"
+         , [(TInt, Identifier "a"); (TString, Identifier "b")]
+         , None ))
 
 let constructor_decl =
   many modifier
   >>= fun constr_modifier_list ->
-  Expression.ident
+  Expression.identifier
   >>= fun constr_name ->
   token "("
   >> sep_by parameter (token ",")
@@ -441,11 +447,16 @@ let constructor_decl =
 
 let%test _ =
   parse constructor_decl (LazyStream.of_string "public Win(object o) {}")
-  = Some (Constructor ([Public], "Win", [(TObject, "o")], StatementBlock []))
+  = Some
+      (Constructor
+         ( [Public]
+         , Identifier "Win"
+         , [(TObject, Identifier "o")]
+         , StatementBlock [] ))
 
 let field_decl =
   let variable_decl =
-    Expression.ident
+    Expression.identifier
     >>= fun field_name ->
     choice
       [ ( token "=" >> Expression.expression
@@ -462,22 +473,25 @@ let field_decl =
 
 let%test _ =
   parse field_decl (LazyStream.of_string "public static int test;")
-  = Some (Field ([Public; Static], TInt, [("test", None)]))
+  = Some (Field ([Public; Static], TInt, [(Identifier "test", None)]))
 
 let%test _ =
   parse field_decl (LazyStream.of_string "public const string mega = \"JB\";")
   = Some
-      (Field ([Public; Const], TString, [("mega", Some (Value (VString "JB")))]))
+      (Field
+         ( [Public; Const]
+         , TString
+         , [(Identifier "mega", Some (Value (VString "JB")))] ))
 
 let class_element = field_decl <|> constructor_decl <|> method_decl
 
 let class_decl =
   many modifier
   >>= fun class_modifier_list ->
-  token "class" >> Expression.ident
+  token "class" >> Expression.identifier
   >>= fun class_name ->
   choice
-    [ ( token ":" >> Expression.ident
+    [ ( token ":" >> Expression.identifier
       >>= fun class_parent_name -> return (Some class_parent_name) )
     ; return None ]
   >>= fun class_parent_name ->
@@ -495,10 +509,15 @@ let class_decl =
 let%test _ =
   parse class_decl
     (LazyStream.of_string "public abstract class JetBrains : Company{}")
-  = Some (Class ([Public; Abstract], "JetBrains", Some "Company", []))
+  = Some
+      (Class
+         ( [Public; Abstract]
+         , Identifier "JetBrains"
+         , Some (Identifier "Company")
+         , [] ))
 
 let%test _ =
   parse class_decl (LazyStream.of_string "public static class JetBrains\n{}")
-  = Some (Class ([Public; Static], "JetBrains", None, []))
+  = Some (Class ([Public; Static], Identifier "JetBrains", None, []))
 
 let parser = many class_decl

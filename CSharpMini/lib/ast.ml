@@ -46,7 +46,7 @@ type cs_expression =
   | Null
   | Value of cs_value
   | Identifier of string
-  | ClassCreation of string * cs_expression list
+  | ClassCreation of cs_expression * cs_expression list
   | ArrayCreationWithSize of cs_type * cs_expression
   | ArrayCreationWithElements of cs_type * cs_expression list
   | CallMethod of cs_expression * cs_expression list
@@ -73,17 +73,22 @@ and cs_statement =
 [@@deriving show]
 
 and cs_field =
-  | Field of cs_modifier list * cs_type * (string * cs_expression option) list
+  | Field of
+      cs_modifier list * cs_type * (cs_expression * cs_expression option) list
   | Method of
       cs_modifier list
       * cs_type
-      * string
-      * (cs_type * string) list
+      * cs_expression
+      * (cs_type * cs_expression) list
       * cs_statement option
   | Constructor of
-      cs_modifier list * string * (cs_type * string) list * cs_statement
+      cs_modifier list
+      * cs_expression
+      * (cs_type * cs_expression) list
+      * cs_statement
 [@@deriving show]
 
 and cs_class =
-  | Class of cs_modifier list * string * string option * cs_field list
+  | Class of
+      cs_modifier list * cs_expression * cs_expression option * cs_field list
 [@@deriving show]
