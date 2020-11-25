@@ -1,50 +1,34 @@
-open Opal
 open Ast
+open Opal
 
-let reserved =
-  [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
-  ; "int"; "bool"; "string"; "void"; "char"; "null"; "new"; "this"; "base"
-  ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
-  ; "continue"; "brake"; "class" ]
-
-let parens = between (token "(") (token ")")
-let braces = between (token "{") (token "}")
-
-(* let brackets = between (token "[") (token "]") *)
-let digits = spaces >> many1 digit => implode
-let integer = digits => int_of_string
-
-(* let list_no_option list = match list with Some x -> x | None -> []
-let list_with_option list = match list with [] -> None | x -> Some x *)
-
-let modifier =
-  choice
-    [ token "public" >> return Public; token "static" >> return Static
-    ; token "const" >> return Const; token "virtual" >> return Virtual
-    ; token "override" >> return Override; token "abstract" >> return Abstract
-    ]
+let apply p s = parse p (LazyStream.of_string s)
 
 module Expression = struct
+  let parens = between (token "(") (token ")")
+  let digits = spaces >> many1 digit => implode
+  let integer = digits => int_of_string
+
+  let%test _ = apply integer " 1901" = Some 1901
+
   let null = token "null" >> return Null
 
-  let%test _ = parse null (LazyStream.of_string "          null") = Some Null
+  let%test _ = apply null "          null" = Some Null
 
   let base = token "base" >> return Base
 
-  let%test _ = parse base (LazyStream.of_string "      base") = Some Base
+  let%test _ = apply base "      base" = Some Base
 
   let this = token "this" >> return This
 
-  let%test _ = parse this (LazyStream.of_string "         this") = Some This
+  let%test _ = apply this "         this" = Some This
 
   let int_value = integer >>= fun i -> return (Value (VInt i))
 
   let%test _ =
-    parse int_value (LazyStream.of_string "            19012001")
-    = Some (Value (VInt 19012001))
+    apply int_value "            19012001" = Some (Value (VInt 19012001))
 
   (* let%test _ =
-     parse int_value (LazyStream.of_string "            19012aa1") = None *)
+     apply int_value "            19012aa1" = None *)
 
   let string_value =
     let string_of_chars chars =
@@ -57,11 +41,17 @@ module Expression = struct
     token "\"" >> return (Value (VString (string_of_chars list)))
 
   let%test _ =
-    parse string_value (LazyStream.of_string "       \"Hello world!\"")
+    apply string_value "       \"Hello world!\""
     = Some (Value (VString "Hello world!"))
 
   let false_value = token "false" >> return (Value (VBool false))
   let true_value = token "true" >> return (Value (VBool true))
+
+  let reserved =
+    [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
+    ; "int"; "bool"; "string"; "void"; "char"; "null"; "new"; "this"; "base"
+    ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
+    ; "continue"; "brake"; "class" ]
 
   let ident =
     spaces >> letter <~> many alpha_num => implode
@@ -70,11 +60,10 @@ module Expression = struct
   let identifier = ident >>= fun s -> return (Identifier s)
 
   let%test _ =
-    parse identifier (LazyStream.of_string "       JetBrains")
-    = Some (Identifier "JetBrains")
+    apply identifier "       JetBrains" = Some (Identifier "JetBrains")
 
-  let%test _ = parse identifier (LazyStream.of_string "     abstract") = None
-  let%test _ = parse identifier (LazyStream.of_string "   1lya") = None
+  let%test _ = apply identifier "     abstract" = None
+  let%test _ = apply identifier "   1lya" = None
 
   let add_op = token "+" >> return (fun x y -> Add (x, y))
   let sub_op = token "-" >> return (fun x y -> Sub (x, y))
@@ -93,58 +82,7 @@ module Expression = struct
   let atomaric =
     choice [identifier; int_value; string_value; true_value; false_value; null]
 
-  let%test _ =
-    parse atomaric (LazyStream.of_string "    false")
-    = Some (Value (VBool false))
-
-  (*let define_type =
-    choice
-      [ token "int" >> return TInt; token "string" >> return TString
-      ; token "object" >> return TObject; token "void" >> return TVoid
-      ; (ident >>= fun class_name -> return (TClass class_name)) ]*)
-
-  let define_type =
-    let check_array t =
-      option ' ' (exactly '[')
-      >>= fun bracket ->
-      match bracket with
-      | '[' -> (
-          many (token ",")
-          >>= fun dim_list ->
-          token "]"
-          >>
-          match List.length dim_list with
-          | 0 when t != TVoid -> return (Some true)
-          | _ -> return (Some false) )
-      | _ -> return None in
-    let type_decision t =
-      check_array t
-      >>= fun result ->
-      match result with
-      | Some true -> return (TArray t)
-      | Some false -> mzero
-      | None -> return t in
-    choice
-      [ token "int" >> type_decision TInt
-      ; token "string" >> type_decision TString
-      ; token "object" >> type_decision TObject
-      ; token "void" >> type_decision TVoid
-      ; (ident >>= fun class_name -> type_decision (TClass class_name)) ]
-
-  let%test _ = parse define_type (LazyStream.of_string " object") = Some TObject
-
-  let%test _ =
-    parse define_type (LazyStream.of_string "   Ilya  ") = Some (TClass "Ilya")
-
-  let%test _ = parse define_type (LazyStream.of_string "   string[,,]") = None
-  let%test _ = parse define_type (LazyStream.of_string "   void[]") = None
-
-  let%test _ =
-    parse define_type (LazyStream.of_string "   int[]") = Some (TArray TInt)
-
-  let%test _ =
-    parse define_type (LazyStream.of_string "   JetBrains[]   ")
-    = Some (TArray (TClass "JetBrains"))
+  let%test _ = apply atomaric "    false" = Some (Value (VBool false))
 
   (* Functions below this point are arranged in ascending order of priority,
      but inside this functions, priorities are in descending order *)
@@ -184,8 +122,11 @@ module Expression = struct
   and array_access input =
     ( this <|> parens array_creation <|> base <|> call_method <|> identifier
     >>= fun array_name ->
-    define_array_index >>= fun index -> return (ArrayAccess (array_name, index))
-    )
+    token "[" >> define_array_index
+    >>= fun index ->
+    match index with
+    | Null -> mzero
+    | _ -> token "]" >> return (ArrayAccess (array_name, index)) )
       input
 
   and access_by_point input =
@@ -206,22 +147,59 @@ module Expression = struct
   and split_by_comma input = sep_by expression (token ",") input
 
   and define_array_index input =
-    ( token "[" >> expression
+    ( option Null expression
     >>= fun index ->
     many (token ",")
     >>= fun commas ->
-    match List.length commas with
-    | 0 -> token "]" >> return index
-    | _ -> token "]" >> mzero )
+    match List.length commas with 0 -> return index | _ -> mzero )
       input
 
-  and call_method input =
-    ( identifier <|> this <|> base
-    >>= fun method_name ->
-    token "(" >> split_by_comma
+  and define_type_and_index input =
+    let check_array t input =
+      ( option ' ' (exactly '[')
+      >>= fun bracket ->
+      match bracket with
+      | '[' -> (
+          define_array_index
+          >>= fun index ->
+          token "]"
+          >>
+          match t with
+          | TInt when index != Null -> return (Some index)
+          | TString when index != Null -> return (Some index)
+          | TObject when index != Null -> return (Some index)
+          | TClass _ when index != Null -> return (Some index)
+          | TVoid -> mzero
+          | _ -> return (Some Null) )
+      | _ -> return None )
+        input in
+    let type_decision t input =
+      ( check_array t
+      >>= fun result ->
+      match result with
+      | Some Null -> return (TArray t, None)
+      | Some index -> return (TArray t, Some index)
+      | None -> return (t, None) )
+        input in
+    (choice
+       [ token "int" >> type_decision TInt
+       ; token "string" >> type_decision TString
+       ; token "object" >> type_decision TObject
+       ; (ident >>= fun class_name -> type_decision (TClass class_name))
+       ; token "void" >> type_decision TVoid ])
+      input
+
+  and call method_name input =
+    ( token "(" >> split_by_comma
     >>= fun list_expr ->
     token ")" >> return (CallMethod (method_name, list_expr)) )
       input
+
+  and call_constructor input =
+    (this <|> base >>= fun constr_name -> call constr_name) input
+
+  and call_method input =
+    (identifier >>= fun method_name -> call method_name) input
 
   and class_creation input =
     ( token "new" >> identifier
@@ -232,16 +210,23 @@ module Expression = struct
       input
 
   and array_creation input =
-    ( token "new" >> define_type
-    >>= fun array_type ->
-    choice
-      [ ( token "[]" >> token "{"
-        >> sep_by1 expression (token ",")
-        >>= fun elements_list ->
-        return (ArrayCreationWithElements (array_type, elements_list)) )
-      ; ( define_array_index
-        >>= fun array_size ->
-        return (ArrayCreationWithSize (array_type, array_size)) ) ] )
+    ( token "new" >> define_type_and_index
+    >>= fun (array_type, array_size) ->
+    match array_type with
+    | TArray array_type ->
+        choice
+          [ ( token "{"
+            >> sep_by expression (token ",")
+            >>= fun array_elements_list ->
+            token "}"
+            >> return
+                 (ArrayCreationWithElements (array_type, array_elements_list))
+            )
+          ; ( match array_size with
+            | None -> mzero
+            | Some array_size ->
+                return (ArrayCreationWithSize (array_type, array_size)) ) ]
+    | _ -> mzero )
       input
 
   and assign input =
@@ -253,12 +238,29 @@ module Expression = struct
 
   (*Priority location is over*)
 
-  let%test _ =
-    parse define_array_index (LazyStream.of_string " [ 14   ]")
-    = Some (Value (VInt 14))
+  let%test _ = apply define_type_and_index "   string[,,]" = None
+  let%test _ = apply define_type_and_index "   void[]" = None
+  let%test _ = apply define_type_and_index " object" = Some (TObject, None)
 
   let%test _ =
-    parse define_array_index (LazyStream.of_string " [ 14, 19 ,99 ]") = None
+    apply define_type_and_index "   Ilya  " = Some (TClass "Ilya", None)
+
+  let%test _ = apply define_type_and_index "   int[]" = Some (TArray TInt, None)
+
+  let%test _ =
+    apply define_type_and_index "   int[99]"
+    = Some (TArray TInt, Some (Value (VInt 99)))
+
+  let%test _ =
+    apply define_type_and_index "   JetBrains[]   "
+    = Some (TArray (TClass "JetBrains"), None)
+
+  let%test _ =
+    apply define_type_and_index "   JetBrains[10]   "
+    = Some (TArray (TClass "JetBrains"), Some (Value (VInt 10)))
+
+  let%test _ = apply define_array_index "  14   " = Some (Value (VInt 14))
+  let%test _ = apply define_array_index "  14, 19 ,99 " = None
 end
 
 module Statement = struct
@@ -266,12 +268,11 @@ module Statement = struct
 
   let break_stat = token "break" >> token ";" >> return Break
 
-  let%test _ = parse break_stat (LazyStream.of_string "break;") = Some Break
+  let%test _ = apply break_stat "break;" = Some Break
 
   let continue_stat = token "continue" >> token ";" >> return Continue
 
-  let%test _ =
-    parse continue_stat (LazyStream.of_string "continue;") = Some Continue
+  let%test _ = apply continue_stat "continue;" = Some Continue
 
   let return_stat =
     token "return"
@@ -279,27 +280,24 @@ module Statement = struct
          [ (expression >>= fun ret -> token ";" >> return (Return (Some ret)))
          ; token ";" >> return (Return None) ]
 
-  let%test _ =
-    parse return_stat (LazyStream.of_string "return;") = Some (Return None)
+  let%test _ = apply return_stat "return;" = Some (Return None)
 
   let%test _ =
-    parse return_stat (LazyStream.of_string "return 0;")
-    = Some (Return (Some (Value (VInt 0))))
+    apply return_stat "return 0;" = Some (Return (Some (Value (VInt 0))))
 
   let%test _ =
-    parse return_stat (LazyStream.of_string "return x >= y;")
+    apply return_stat "return x >= y;"
     = Some (Return (Some (MoreOrEqual (Identifier "x", Identifier "y"))))
 
   let expression_stat =
     expression >>= fun expr -> token ";" >> return (Expression expr)
 
   let%test _ =
-    parse expression_stat (LazyStream.of_string "Call();")
+    apply expression_stat "Call();"
     = Some (Expression (CallMethod (Identifier "Call", [])))
 
   let%test _ =
-    parse expression_stat (LazyStream.of_string "--m;")
-    = Some (Expression (PrefDec (Identifier "m")))
+    apply expression_stat "--m;" = Some (Expression (PrefDec (Identifier "m")))
 
   let rec statement input =
     choice
@@ -308,9 +306,9 @@ module Statement = struct
       input
 
   and if_stat input =
-    ( token "if" >> parens expression
+    ( token "if" >> token "(" >> expression
     >>= fun condition ->
-    statement
+    token ")" >> statement
     >>= fun if_body ->
     choice
       [ ( token "else" >> statement
@@ -319,14 +317,15 @@ module Statement = struct
       input
 
   and statement_block input =
-    ( braces (sep_by statement spaces)
-    >>= fun block_stat -> return (StatementBlock block_stat) )
+    ( token "{" >> sep_by statement spaces
+    >>= fun block_stat -> token "}" >> return (StatementBlock block_stat) )
       input
 
   and while_stat input =
-    ( token "while" >> parens expression
+    ( token "while" >> token "(" >> expression
     >>= fun condition ->
-    statement >>= fun while_body -> return (While (condition, while_body)) )
+    token ")" >> statement
+    >>= fun while_body -> return (While (condition, while_body)) )
       input
 
   and variable_decl input =
@@ -336,8 +335,8 @@ module Statement = struct
       token "=" >> expression
       >>= (fun variable_value -> return (variable_name, Some variable_value))
       <|> return (variable_name, None) in
-    ( define_type
-    >>= fun variable_type ->
+    ( define_type_and_index
+    >>= fun (variable_type, _) ->
     sep_by1 identifier_and_value (token ",")
     >>= fun variable_decl_list ->
     token ";" >> return (VariableDecl (variable_type, variable_decl_list)) )
@@ -363,161 +362,187 @@ module Statement = struct
     token "throw" >> expression >>= fun except -> return (Throw except)
 end
 
-let parameter =
-  Expression.define_type
-  >>= fun parameter_type ->
-  Expression.identifier
-  >>= fun parameter_identifier -> return (parameter_type, parameter_identifier)
-
-let%test _ =
-  parse
-    (sep_by parameter (token ","))
-    (LazyStream.of_string "int a, string b, object o")
-  = Some
-      [ (TInt, Identifier "a"); (TString, Identifier "b")
-      ; (TObject, Identifier "o") ]
-
-let method_decl =
-  many modifier
-  >>= fun method_modifier_list ->
-  Expression.define_type
-  >>= fun method_type ->
-  Expression.identifier
-  >>= fun method_name ->
-  token "("
-  >> sep_by parameter (token ",")
-  >>= fun method_parameter_list ->
-  token ")"
-  >> choice
-       [ ( Statement.statement_block
-         >>= fun method_statement_block ->
-         return
-           (Method
-              ( method_modifier_list
-              , method_type
-              , method_name
-              , method_parameter_list
-              , Some method_statement_block )) )
-       ; token ";"
-         >> return
-              (Method
-                 ( method_modifier_list
-                 , method_type
-                 , method_name
-                 , method_parameter_list
-                 , None )) ]
-
-let%test _ =
-  parse method_decl (LazyStream.of_string "public int Sum(int a, string b) {}")
-  = Some
-      (Method
-         ( [Public]
-         , TInt
-         , Identifier "Sum"
-         , [(TInt, Identifier "a"); (TString, Identifier "b")]
-         , Some (StatementBlock []) ))
-
-let%test _ =
-  parse method_decl
-    (LazyStream.of_string "public abstract int Sum(int a, string b);")
-  = Some
-      (Method
-         ( [Public; Abstract]
-         , TInt
-         , Identifier "Sum"
-         , [(TInt, Identifier "a"); (TString, Identifier "b")]
-         , None ))
-
-let constructor_decl =
-  many modifier
-  >>= fun constr_modifier_list ->
-  Expression.identifier
-  >>= fun constr_name ->
-  token "("
-  >> sep_by parameter (token ",")
-  >>= fun constr_parameter_list ->
-  token ")" >> Statement.statement_block
-  >>= fun constr_statement_block ->
-  return
-    (Constructor
-       ( constr_modifier_list
-       , constr_name
-       , constr_parameter_list
-       , constr_statement_block ))
-
-let%test _ =
-  parse constructor_decl (LazyStream.of_string "public Win(object o) {}")
-  = Some
-      (Constructor
-         ( [Public]
-         , Identifier "Win"
-         , [(TObject, Identifier "o")]
-         , StatementBlock [] ))
-
-let field_decl =
-  let variable_decl =
-    Expression.identifier
-    >>= fun field_name ->
+module Class = struct
+  let modifier =
     choice
-      [ ( token "=" >> Expression.expression
-        >>= fun field_value -> return (field_name, Some field_value) )
-      ; return (field_name, None) ] in
-  many modifier
-  >>= fun field_modifier_list ->
-  Expression.define_type
-  >>= fun field_type ->
-  sep_by variable_decl (token ",")
-  >>= fun variable_decl_list ->
-  token ";"
-  >> return (Field (field_modifier_list, field_type, variable_decl_list))
+      [ token "public" >> return Public; token "static" >> return Static
+      ; token "const" >> return Const; token "virtual" >> return Virtual
+      ; token "override" >> return Override; token "abstract" >> return Abstract
+      ]
 
-let%test _ =
-  parse field_decl (LazyStream.of_string "public static int test;")
-  = Some (Field ([Public; Static], TInt, [(Identifier "test", None)]))
+  let%test _ =
+    apply (many modifier) "public static abstract"
+    = Some [Public; Static; Abstract]
 
-let%test _ =
-  parse field_decl (LazyStream.of_string "public const string mega = \"JB\";")
-  = Some
-      (Field
-         ( [Public; Const]
-         , TString
-         , [(Identifier "mega", Some (Value (VString "JB")))] ))
+  let parameter =
+    Expression.define_type_and_index
+    >>= fun (parameter_type, _) ->
+    Expression.identifier
+    >>= fun parameter_identifier -> return (parameter_type, parameter_identifier)
 
-let class_element = field_decl <|> constructor_decl <|> method_decl
+  let%test _ =
+    apply (sep_by parameter (token ",")) "int a, string b, object o"
+    = Some
+        [ (TInt, Identifier "a"); (TString, Identifier "b")
+        ; (TObject, Identifier "o") ]
 
-let class_decl =
-  many modifier
-  >>= fun class_modifier_list ->
-  token "class" >> Expression.identifier
-  >>= fun class_name ->
-  choice
-    [ ( token ":" >> Expression.identifier
-      >>= fun class_parent_name -> return (Some class_parent_name) )
-    ; return None ]
-  >>= fun class_parent_name ->
-  token "{"
-  >> sep_by class_element spaces (* TODO: discuss! *)
-  >>= fun class_element_list ->
-  token "}"
-  >> return
-       (Class
-          ( class_modifier_list
-          , class_name
-          , class_parent_name
-          , class_element_list ))
+  let method_decl =
+    many modifier
+    >>= fun method_modifier_list ->
+    Expression.define_type_and_index
+    >>= fun (method_type, _) ->
+    Expression.identifier
+    >>= fun method_name ->
+    token "("
+    >> sep_by parameter (token ",")
+    >>= fun method_parameter_list ->
+    token ")"
+    >> choice
+         [ ( Statement.statement_block
+           >>= fun method_statement_block ->
+           return
+             (Method
+                ( method_modifier_list
+                , method_type
+                , method_name
+                , method_parameter_list
+                , Some method_statement_block )) )
+         ; token ";"
+           >> return
+                (Method
+                   ( method_modifier_list
+                   , method_type
+                   , method_name
+                   , method_parameter_list
+                   , None )) ]
 
-let%test _ =
-  parse class_decl
-    (LazyStream.of_string "public abstract class JetBrains : Company{}")
-  = Some
-      (Class
-         ( [Public; Abstract]
-         , Identifier "JetBrains"
-         , Some (Identifier "Company")
-         , [] ))
+  let%test _ =
+    apply method_decl "public int Sum(int a, string b) {}"
+    = Some
+        (Method
+           ( [Public]
+           , TInt
+           , Identifier "Sum"
+           , [(TInt, Identifier "a"); (TString, Identifier "b")]
+           , Some (StatementBlock []) ))
 
-let%test _ =
-  parse class_decl (LazyStream.of_string "public static class JetBrains\n{}")
-  = Some (Class ([Public; Static], Identifier "JetBrains", None, []))
+  let%test _ =
+    apply method_decl "public abstract int Sum(int a, string b);"
+    = Some
+        (Method
+           ( [Public; Abstract]
+           , TInt
+           , Identifier "Sum"
+           , [(TInt, Identifier "a"); (TString, Identifier "b")]
+           , None ))
 
-let parser = many class_decl
+  let constructor_decl =
+    many modifier
+    >>= fun constr_modifier_list ->
+    Expression.identifier
+    >>= fun constr_name ->
+    token "("
+    >> sep_by parameter (token ",")
+    >>= fun constr_parameter_list ->
+    token ")"
+    >> choice
+         [ ( token ":" >> Expression.call_constructor
+           >>= fun constr_name -> return (Some constr_name) ); return None ]
+    >>= fun call_constr_name ->
+    Statement.statement_block
+    >>= fun constr_statement_block ->
+    return
+      (Constructor
+         ( constr_modifier_list
+         , constr_name
+         , constr_parameter_list
+         , call_constr_name
+         , constr_statement_block ))
+
+  let%test _ =
+    apply constructor_decl "public Win(object o) {}"
+    = Some
+        (Constructor
+           ( [Public]
+           , Identifier "Win"
+           , [(TObject, Identifier "o")]
+           , None
+           , StatementBlock [] ))
+
+  let%test _ =
+    apply constructor_decl "public Win(object o, string m) : base(m) {}"
+    = Some
+        (Constructor
+           ( [Public]
+           , Identifier "Win"
+           , [(TObject, Identifier "o"); (TString, Identifier "m")]
+           , Some (CallMethod (Base, [Identifier "m"]))
+           , StatementBlock [] ))
+
+  let field_decl =
+    let variable_decl =
+      Expression.identifier
+      >>= fun field_name ->
+      choice
+        [ ( token "=" >> Expression.expression
+          >>= fun field_value -> return (field_name, Some field_value) )
+        ; return (field_name, None) ] in
+    many modifier
+    >>= fun field_modifier_list ->
+    Expression.define_type_and_index
+    >>= fun (field_type, _) ->
+    sep_by variable_decl (token ",")
+    >>= fun variable_decl_list ->
+    token ";"
+    >> return (Field (field_modifier_list, field_type, variable_decl_list))
+
+  let%test _ =
+    apply field_decl "public static int test;"
+    = Some (Field ([Public; Static], TInt, [(Identifier "test", None)]))
+
+  let%test _ =
+    apply field_decl "public const string mega = \"JB\";"
+    = Some
+        (Field
+           ( [Public; Const]
+           , TString
+           , [(Identifier "mega", Some (Value (VString "JB")))] ))
+
+  let class_element = field_decl <|> constructor_decl <|> method_decl
+
+  let class_decl =
+    many modifier
+    >>= fun class_modifier_list ->
+    token "class" >> Expression.identifier
+    >>= fun class_name ->
+    choice
+      [ ( token ":" >> Expression.identifier
+        >>= fun class_parent_name -> return (Some class_parent_name) )
+      ; return None ]
+    >>= fun class_parent_name ->
+    token "{"
+    >> sep_by class_element spaces
+    >>= fun class_element_list ->
+    token "}"
+    >> return
+         (Class
+            ( class_modifier_list
+            , class_name
+            , class_parent_name
+            , class_element_list ))
+
+  let%test _ =
+    apply class_decl "public abstract class JetBrains : Company{}"
+    = Some
+        (Class
+           ( [Public; Abstract]
+           , Identifier "JetBrains"
+           , Some (Identifier "Company")
+           , [] ))
+
+  let%test _ =
+    apply class_decl "public static class JetBrains\n{}"
+    = Some (Class ([Public; Static], Identifier "JetBrains", None, []))
+end
+
+let parser = many Class.class_decl

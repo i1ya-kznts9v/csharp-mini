@@ -85,6 +85,7 @@ and cs_field =
       cs_modifier list
       * cs_expression
       * (cs_type * cs_expression) list
+      * cs_expression option
       * cs_statement
 [@@deriving show]
 
