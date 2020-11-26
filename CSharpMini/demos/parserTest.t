@@ -1,4 +1,4 @@
-  $ (cd ../../../../../default/CSharpMini/demos && ./parserTest.exe)
+  $ (cd ../../../../default && demos/parserTest.exe)
   Ast.Class
   ([Ast.Public], Ast.Identifier ("Program"), None,
    [Ast.Method
@@ -159,3 +159,4 @@
                                                             [Ast.Identifier ("i")])))]),
                                                        Some (Ast.StatementBlock (
                                                               [Ast.Continue])))]))])))])
+ 
