@@ -1,0 +1,13 @@
+(env
+ (dev
+  (flags
+   (:standard -warn-error -A -w -26))))
+
+(library
+ (name lambda_lib)
+ (public_name Lambda.Lib)
+ (modules Lambda Parsing Tests)
+ (libraries ppx_show.runtime)
+ (inline_tests)
+ (preprocess
+  (pps ppx_expect)))
