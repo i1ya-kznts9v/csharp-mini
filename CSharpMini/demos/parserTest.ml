@@ -1,6 +1,5 @@
 open Csharpmini_lib.Ast
 open Csharpmini_lib.Parser
-open Opal
 
 let list_no_option list = match list with Some x -> x | None -> []
 
