@@ -125,7 +125,7 @@ module Expression = struct
     token "[" >> define_array_index
     >>= fun index ->
     match index with
-    | Null -> mzero
+    | Null -> token "]" >> mzero
     | _ -> token "]" >> return (ArrayAccess (array_name, index)) )
       input
 
@@ -154,7 +154,7 @@ module Expression = struct
     match List.length commas with 0 -> return index | _ -> mzero )
       input
 
-  and define_type_and_index input =
+  and define_type_and_index_option input =
     let check_array t input =
       ( option ' ' (exactly '[')
       >>= fun bracket ->
@@ -173,7 +173,7 @@ module Expression = struct
           | _ -> return (Some Null) )
       | _ -> return None )
         input in
-    let type_decision t input =
+    let type_and_index_decision t input =
       ( check_array t
       >>= fun result ->
       match result with
@@ -182,11 +182,12 @@ module Expression = struct
       | None -> return (t, None) )
         input in
     (choice
-       [ token "int" >> type_decision TInt
-       ; token "string" >> type_decision TString
-       ; token "object" >> type_decision TObject
-       ; (ident >>= fun class_name -> type_decision (TClass class_name))
-       ; token "void" >> type_decision TVoid ])
+       [ token "int" >> type_and_index_decision TInt
+       ; token "string" >> type_and_index_decision TString
+       ; token "object" >> type_and_index_decision TObject
+       ; ( ident
+         >>= fun class_name -> type_and_index_decision (TClass class_name) )
+       ; token "void" >> type_and_index_decision TVoid ])
       input
 
   and call method_name input =
@@ -210,7 +211,7 @@ module Expression = struct
       input
 
   and array_creation input =
-    ( token "new" >> define_type_and_index
+    ( token "new" >> define_type_and_index_option
     >>= fun (array_type, array_size) ->
     match array_type with
     | TArray array_type ->
@@ -238,25 +239,28 @@ module Expression = struct
 
   (*Priority location is over*)
 
-  let%test _ = apply define_type_and_index "   string[,,]" = None
-  let%test _ = apply define_type_and_index "   void[]" = None
-  let%test _ = apply define_type_and_index " object" = Some (TObject, None)
+  let%test _ = apply define_type_and_index_option "   string[,,]" = None
+  let%test _ = apply define_type_and_index_option "   void[]" = None
 
   let%test _ =
-    apply define_type_and_index "   Ilya  " = Some (TClass "Ilya", None)
-
-  let%test _ = apply define_type_and_index "   int[]" = Some (TArray TInt, None)
+    apply define_type_and_index_option " object" = Some (TObject, None)
 
   let%test _ =
-    apply define_type_and_index "   int[99]"
+    apply define_type_and_index_option "   Ilya  " = Some (TClass "Ilya", None)
+
+  let%test _ =
+    apply define_type_and_index_option "   int[]" = Some (TArray TInt, None)
+
+  let%test _ =
+    apply define_type_and_index_option "   int[99]"
     = Some (TArray TInt, Some (Value (VInt 99)))
 
   let%test _ =
-    apply define_type_and_index "   JetBrains[]   "
+    apply define_type_and_index_option "   JetBrains[]   "
     = Some (TArray (TClass "JetBrains"), None)
 
   let%test _ =
-    apply define_type_and_index "   JetBrains[10]   "
+    apply define_type_and_index_option "   JetBrains[10]   "
     = Some (TArray (TClass "JetBrains"), Some (Value (VInt 10)))
 
   let%test _ = apply define_array_index "  14   " = Some (Value (VInt 14))
@@ -335,11 +339,15 @@ module Statement = struct
       token "=" >> expression
       >>= (fun variable_value -> return (variable_name, Some variable_value))
       <|> return (variable_name, None) in
-    ( define_type_and_index
-    >>= fun (variable_type, _) ->
-    sep_by1 identifier_and_value (token ",")
-    >>= fun variable_decl_list ->
-    token ";" >> return (VariableDecl (variable_type, variable_decl_list)) )
+    ( define_type_and_index_option
+    >>= fun (variable_type, variable_index) ->
+    match variable_index with
+    | Some _ -> mzero
+    | None ->
+        sep_by1 identifier_and_value (token ",")
+        >>= fun variable_decl_list ->
+        token ";" >> return (VariableDecl (variable_type, variable_decl_list))
+    )
       input
 
   and for_stat input =
@@ -375,10 +383,14 @@ module Class = struct
     = Some [Public; Static; Abstract]
 
   let parameter =
-    Expression.define_type_and_index
-    >>= fun (parameter_type, _) ->
-    Expression.identifier
-    >>= fun parameter_identifier -> return (parameter_type, parameter_identifier)
+    Expression.define_type_and_index_option
+    >>= fun (parameter_type, parameter_index) ->
+    match parameter_index with
+    | Some _ -> mzero
+    | None ->
+        Expression.identifier
+        >>= fun parameter_identifier ->
+        return (parameter_type, parameter_identifier)
 
   let%test _ =
     apply (sep_by parameter (token ",")) "int a, string b, object o"
@@ -389,32 +401,35 @@ module Class = struct
   let method_decl =
     many modifier
     >>= fun method_modifier_list ->
-    Expression.define_type_and_index
-    >>= fun (method_type, _) ->
-    Expression.identifier
-    >>= fun method_name ->
-    token "("
-    >> sep_by parameter (token ",")
-    >>= fun method_parameter_list ->
-    token ")"
-    >> choice
-         [ ( Statement.statement_block
-           >>= fun method_statement_block ->
-           return
-             (Method
-                ( method_modifier_list
-                , method_type
-                , method_name
-                , method_parameter_list
-                , Some method_statement_block )) )
-         ; token ";"
-           >> return
-                (Method
-                   ( method_modifier_list
-                   , method_type
-                   , method_name
-                   , method_parameter_list
-                   , None )) ]
+    Expression.define_type_and_index_option
+    >>= fun (method_type, method_index) ->
+    match method_index with
+    | Some _ -> mzero
+    | None ->
+        Expression.identifier
+        >>= fun method_name ->
+        token "("
+        >> sep_by parameter (token ",")
+        >>= fun method_parameter_list ->
+        token ")"
+        >> choice
+             [ ( Statement.statement_block
+               >>= fun method_statement_block ->
+               return
+                 (Method
+                    ( method_modifier_list
+                    , method_type
+                    , method_name
+                    , method_parameter_list
+                    , Some method_statement_block )) )
+             ; token ";"
+               >> return
+                    (Method
+                       ( method_modifier_list
+                       , method_type
+                       , method_name
+                       , method_parameter_list
+                       , None )) ]
 
   let%test _ =
     apply method_decl "public int Sum(int a, string b) {}"
@@ -489,12 +504,15 @@ module Class = struct
         ; return (field_name, None) ] in
     many modifier
     >>= fun field_modifier_list ->
-    Expression.define_type_and_index
-    >>= fun (field_type, _) ->
-    sep_by variable_decl (token ",")
-    >>= fun variable_decl_list ->
-    token ";"
-    >> return (Field (field_modifier_list, field_type, variable_decl_list))
+    Expression.define_type_and_index_option
+    >>= fun (field_type, field_index) ->
+    match field_index with
+    | Some _ -> mzero
+    | None ->
+        sep_by variable_decl (token ",")
+        >>= fun variable_decl_list ->
+        token ";"
+        >> return (Field (field_modifier_list, field_type, variable_decl_list))
 
   let%test _ =
     apply field_decl "public static int test;"

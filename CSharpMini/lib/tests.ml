@@ -178,5 +178,382 @@ module Expression = struct
               , PostInc (Mult (Identifier "x", Identifier "y")) )))
 end
 
-module Statement = struct end
-module Class = struct end
+module Statement = struct
+  let%test _ =
+    apply statement "int a = 0, b = 1, c, d = 17;"
+    = Some
+        (VariableDecl
+           ( TInt
+           , [ (Identifier "a", Some (Value (VInt 0)))
+             ; (Identifier "b", Some (Value (VInt 1))); (Identifier "c", None)
+             ; (Identifier "d", Some (Value (VInt 17))) ] ))
+
+  let%test _ =
+    apply statement "int[] array = new int[19 + 1];"
+    = Some
+        (VariableDecl
+           ( TArray TInt
+           , [ ( Identifier "array"
+               , Some
+                   (ArrayCreationWithSize
+                      (TInt, Add (Value (VInt 19), Value (VInt 1)))) ) ] ))
+
+  let%test _ = apply statement "int[20] array = new int[19 + 1];" = None
+
+  let%test _ =
+    apply statement "string a = \"a\", b = \"1\", c = \"a1\";"
+    = Some
+        (VariableDecl
+           ( TString
+           , [ (Identifier "a", Some (Value (VString "a")))
+             ; (Identifier "b", Some (Value (VString "1")))
+             ; (Identifier "c", Some (Value (VString "a1"))) ] ))
+
+  let%test _ =
+    apply statement "if (x <= 10 * a) ++x;"
+    = Some
+        (If
+           ( LessOrEqual (Identifier "x", Mult (Value (VInt 10), Identifier "a"))
+           , Expression (PrefInc (Identifier "x"))
+           , None ))
+
+  let%test _ =
+    apply statement
+      "if (a < b)\n{\n return b - a; \n }\n else \n{ \n return a - b; \n }"
+    = Some
+        (If
+           ( Less (Identifier "a", Identifier "b")
+           , StatementBlock
+               [Return (Some (Sub (Identifier "b", Identifier "a")))]
+           , Some
+               (StatementBlock
+                  [Return (Some (Sub (Identifier "a", Identifier "b")))]) ))
+
+  let%test _ =
+    apply statement "array = new int[77];"
+    = Some
+        (Expression
+           (Assign
+              (Identifier "array", ArrayCreationWithSize (TInt, Value (VInt 77)))))
+
+  let%test _ =
+    apply statement
+      {|
+      if (a % 2 == 0 && b < 2)
+      {
+        a++;
+        --b;
+        return a * b;
+      } 
+      else if (!(b / 2 != 5)) 
+      {
+        b = b + 40;
+        return (a + b)*3;
+      } 
+      else continue;
+      |}
+    = Some
+        (If
+           ( And
+               ( Equal (Mod (Identifier "a", Value (VInt 2)), Value (VInt 0))
+               , Less (Identifier "b", Value (VInt 2)) )
+           , StatementBlock
+               [ Expression (PostInc (Identifier "a"))
+               ; Expression (PrefDec (Identifier "b"))
+               ; Return (Some (Mult (Identifier "a", Identifier "b"))) ]
+           , Some
+               (If
+                  ( Not
+                      (NotEqual
+                         (Div (Identifier "b", Value (VInt 2)), Value (VInt 5)))
+                  , StatementBlock
+                      [ Expression
+                          (Assign
+                             ( Identifier "b"
+                             , Add (Identifier "b", Value (VInt 40)) ))
+                      ; Return
+                          (Some
+                             (Mult
+                                ( Add (Identifier "a", Identifier "b")
+                                , Value (VInt 3) ))) ]
+                  , Some Continue )) ))
+
+  let%test _ =
+    apply statement
+      {|
+      while (d * d <= n)
+      { 
+        if (n % d == 0)
+        { 
+          break;          
+        } 
+        d++; 
+      }
+      |}
+    = Some
+        (While
+           ( LessOrEqual (Mult (Identifier "d", Identifier "d"), Identifier "n")
+           , StatementBlock
+               [ If
+                   ( Equal (Mod (Identifier "n", Identifier "d"), Value (VInt 0))
+                   , StatementBlock [Break]
+                   , None ); Expression (PostInc (Identifier "d")) ] ))
+
+  let%test _ =
+    apply statement
+      {|
+      for (int i = 0, j = n - 1; i >= j; i++, j--)
+      {
+        Console.WriteLine("test");
+      }
+      |}
+    = Some
+        (For
+           ( Some
+               (VariableDecl
+                  ( TInt
+                  , [ (Identifier "i", Some (Value (VInt 0)))
+                    ; ( Identifier "j"
+                      , Some (Sub (Identifier "n", Value (VInt 1))) ) ] ))
+           , Some (MoreOrEqual (Identifier "i", Identifier "j"))
+           , [PostInc (Identifier "i"); PostDec (Identifier "j")]
+           , StatementBlock
+               [ Expression
+                   (AccessByPoint
+                      ( Identifier "Console"
+                      , CallMethod
+                          (Identifier "WriteLine", [Value (VString "test")]) ))
+               ] ))
+
+  let%test _ =
+    apply statement
+      {|
+      if (Mistake())
+        throw new Exception("Bad reference");
+      |}
+    = Some
+        (If
+           ( CallMethod (Identifier "Mistake", [])
+           , Throw
+               (ClassCreation
+                  (Identifier "Exception", [Value (VString "Bad reference")]))
+           , None ))
+
+  let%test _ = apply statement "for(public int i = 0;;) {i++;}" = None
+end
+
+module Class = struct
+  let%test _ =
+    apply field_decl "public static int[] kids;"
+    = Some (Field ([Public; Static], TArray TInt, [(Identifier "kids", None)]))
+
+  let%test _ = apply field_decl "public static int[5] kids;" = None
+
+  let%test _ =
+    apply method_decl
+      {|
+      public virtual int ArraySum (int[] a)
+      { 
+        int sum = 0; 
+        for (int i = 0; i < a.Length(); i++) 
+        {            
+          sum = sum + a[i];
+        } 
+        return sum; 
+      }
+      |}
+    = Some
+        (Method
+           ( [Public; Virtual]
+           , TInt
+           , Identifier "ArraySum"
+           , [(TArray TInt, Identifier "a")]
+           , Some
+               (StatementBlock
+                  [ VariableDecl
+                      (TInt, [(Identifier "sum", Some (Value (VInt 0)))])
+                  ; For
+                      ( Some
+                          (VariableDecl
+                             (TInt, [(Identifier "i", Some (Value (VInt 0)))]))
+                      , Some
+                          (Less
+                             ( Identifier "i"
+                             , AccessByPoint
+                                 ( Identifier "a"
+                                 , CallMethod (Identifier "Length", []) ) ))
+                      , [PostInc (Identifier "i")]
+                      , StatementBlock
+                          [ Expression
+                              (Assign
+                                 ( Identifier "sum"
+                                 , Add
+                                     ( Identifier "sum"
+                                     , ArrayAccess
+                                         (Identifier "a", Identifier "i") ) ))
+                          ] ); Return (Some (Identifier "sum")) ]) ))
+
+  let%test _ =
+    apply constructor_decl
+      {|
+      public Car(int speed, int[] wheels)
+      {
+        this.speed = speed; 
+        this.wheels = wheels;
+      }
+      |}
+    = Some
+        (Constructor
+           ( [Public]
+           , Identifier "Car"
+           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , None
+           , StatementBlock
+               [ Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "speed")
+                      , Identifier "speed" ))
+               ; Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "wheels")
+                      , Identifier "wheels" )) ] ))
+
+  let%test _ =
+    apply constructor_decl
+      {|
+      public Car(int speed, int[] wheels) : base(wheels)
+      {
+        this.speed = speed; 
+        this.wheels = wheels;
+      }
+      |}
+    = Some
+        (Constructor
+           ( [Public]
+           , Identifier "Car"
+           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , Some (CallMethod (Base, [Identifier "wheels"]))
+           , StatementBlock
+               [ Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "speed")
+                      , Identifier "speed" ))
+               ; Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "wheels")
+                      , Identifier "wheels" )) ] ))
+
+  let%test _ =
+    apply constructor_decl
+      {|
+      public Car(int speed, int[] wheels) : this()
+      {
+        this.speed = speed; 
+        this.wheels = wheels;
+      }
+      |}
+    = Some
+        (Constructor
+           ( [Public]
+           , Identifier "Car"
+           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , Some (CallMethod (This, []))
+           , StatementBlock
+               [ Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "speed")
+                      , Identifier "speed" ))
+               ; Expression
+                   (Assign
+                      ( AccessByPoint (This, Identifier "wheels")
+                      , Identifier "wheels" )) ] ))
+
+  let%test _ =
+    apply constructor_decl
+      {|
+      public Car(int speed, int[] wheels) : Vehicle(wheels)
+      {
+        this.speed = speed; 
+        this.wheels = wheels;
+      }
+      |}
+    = None
+
+  let%test _ =
+    apply class_decl
+      {|
+      public class JetBrains : Company
+      {
+        int employees = 1000;
+        string status = "Close";
+
+        public override void InviteToJob()
+        {
+          employees++;
+        }
+
+        public override void DismissFromJob()
+        {
+          employees--;
+        }
+
+        public override void Open()
+        {
+          status = "Open";
+        }
+
+        public override void Close()
+        {
+          status = "Close";
+        }
+      }
+      |}
+    = Some
+        (Class
+           ( [Public]
+           , Identifier "JetBrains"
+           , Some (Identifier "Company")
+           , [ Field
+                 ([], TInt, [(Identifier "employees", Some (Value (VInt 1000)))])
+             ; Field
+                 ( []
+                 , TString
+                 , [(Identifier "status", Some (Value (VString "Close")))] )
+             ; Method
+                 ( [Public; Override]
+                 , TVoid
+                 , Identifier "InviteToJob"
+                 , []
+                 , Some
+                     (StatementBlock
+                        [Expression (PostInc (Identifier "employees"))]) )
+             ; Method
+                 ( [Public; Override]
+                 , TVoid
+                 , Identifier "DismissFromJob"
+                 , []
+                 , Some
+                     (StatementBlock
+                        [Expression (PostDec (Identifier "employees"))]) )
+             ; Method
+                 ( [Public; Override]
+                 , TVoid
+                 , Identifier "Open"
+                 , []
+                 , Some
+                     (StatementBlock
+                        [ Expression
+                            (Assign (Identifier "status", Value (VString "Open")))
+                        ]) )
+             ; Method
+                 ( [Public; Override]
+                 , TVoid
+                 , Identifier "Close"
+                 , []
+                 , Some
+                     (StatementBlock
+                        [ Expression
+                            (Assign
+                               (Identifier "status", Value (VString "Close")))
+                        ]) ) ] ))
+end
