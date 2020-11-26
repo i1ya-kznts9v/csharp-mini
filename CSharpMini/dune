@@ -5,4 +5,4 @@
  (libraries CSharpMini.Lib))
 
 (cram
- (deps demos/demoFirst.exe))
+ (deps demos/parserTest.exe))

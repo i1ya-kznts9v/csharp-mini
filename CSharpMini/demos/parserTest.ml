@@ -4,8 +4,6 @@ open Opal
 
 let list_no_option list = match list with Some x -> x | None -> []
 
-(* let list_with_option list = match list with [] -> None | x -> Some x *)
-
 let rec print_list = function
   | [] -> print_string ""
   | hd :: tl ->
@@ -13,5 +11,99 @@ let rec print_list = function
       print_endline "" ;
       print_list tl
 
-let parse_result = list_no_option (parse parser (LazyStream.of_string {|
-|}))
+let parse_result =
+  list_no_option
+    (apply parser
+       {|
+public class Program
+{
+  public static void Main(string[] args) 
+  {
+    Person person = new Person(100, 50);
+
+    person.SetAge(45);
+	  Console.WriteLine(person.GetAge());
+		
+    Child child = new Child(50, 10);
+    
+    child.SetCash(1000);
+    Console.WriteLine(child.GetCash());
+
+		child.TellEvenNumbers(333);
+	}
+}
+
+public class Person
+{
+  public int weight;
+  public int age;
+  
+  public Person(int weight, int age) 
+  {
+    this.weight = weight;
+    this.age = age;
+  }
+  
+  public int GetWeight()
+  {
+    return weight;
+  }
+
+  public void SetWeight(int weight)
+  {
+    this.weight = weight;
+  }
+  
+  public int GetAge()
+  {
+    return age;
+  }
+
+  public void SetAge(int age)
+  {
+    this.age = age;
+  }
+}
+
+public class Child : Person
+{
+  public int cash;
+  
+  public Child(int weight, int age) : base(weight, age)
+  {
+    cash = 0;
+  }
+
+  public Child(int weight, int age, int cash) : this(weight, age)
+  {
+    this.cash = cash;
+  }
+  
+  public int GetCash()
+  {
+    return cash;
+  }
+  
+  public void SetCash(int cash)
+  {
+    this.cash = cash;
+  }
+  
+  public void TellEvenNumbers(int count) 
+  {
+    for (int i = 0; i < count; i++)
+    {
+      if (i % 2 == 0 && !(i % 2 == 1))
+      {
+        Console.WriteLine(i);
+      }
+      else
+      {
+        continue;
+      }
+    }
+  }
+}
+|})
+
+let test = print_list parse_result

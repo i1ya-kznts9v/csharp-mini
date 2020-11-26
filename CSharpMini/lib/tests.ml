@@ -2,7 +2,6 @@ open Parser
 open Parser.Expression
 open Parser.Statement
 open Parser.Class
-open Opal
 
 module Expression = struct
   let%test _ =
