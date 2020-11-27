@@ -4,7 +4,9 @@ open Opal
 let apply p s = parse p (LazyStream.of_string s)
 
 module Expression = struct
-  let parens = between (token "(") (token ")")
+  let parens parser =
+    token "(" >> parser >>= fun result -> token ")" >> return result
+
   let digits = spaces >> many1 digit => implode
   let integer = digits => int_of_string
 
@@ -79,10 +81,10 @@ module Expression = struct
   let equal_op = token "==" >> return (fun x y -> Equal (x, y))
   let not_equal_op = token "!=" >> return (fun x y -> NotEqual (x, y))
 
-  let atomaric =
+  let atomic =
     choice [identifier; int_value; string_value; true_value; false_value; null]
 
-  let%test _ = apply atomaric "    false" = Some (Value (VBool false))
+  let%test _ = apply atomic "    false" = Some (Value (VBool false))
 
   (* Functions below this point are arranged in ascending order of priority,
      but inside this functions, priorities are in descending order *)
@@ -116,7 +118,7 @@ module Expression = struct
   and primary_expr input =
     ( class_creation <|> array_creation <|> assign <|> access_by_point
     <|> array_access <|> call_method <|> this <|> base <|> parens expression
-    <|> atomaric )
+    <|> atomic )
       input
 
   and array_access input =
@@ -191,9 +193,8 @@ module Expression = struct
       input
 
   and call method_name input =
-    ( token "(" >> split_by_comma
-    >>= fun list_expr ->
-    token ")" >> return (CallMethod (method_name, list_expr)) )
+    ( parens split_by_comma
+    >>= fun list_expr -> return (CallMethod (method_name, list_expr)) )
       input
 
   and call_constructor input =
@@ -205,9 +206,8 @@ module Expression = struct
   and class_creation input =
     ( token "new" >> identifier
     >>= fun class_name ->
-    token "(" >> split_by_comma
-    >>= fun list_expr ->
-    token ")" >> return (ClassCreation (class_name, list_expr)) )
+    parens split_by_comma
+    >>= fun list_expr -> return (ClassCreation (class_name, list_expr)) )
       input
 
   and array_creation input =
@@ -310,9 +310,9 @@ module Statement = struct
       input
 
   and if_stat input =
-    ( token "if" >> token "(" >> expression
+    ( token "if" >> parens expression
     >>= fun condition ->
-    token ")" >> statement
+    statement
     >>= fun if_body ->
     choice
       [ ( token "else" >> statement
@@ -326,10 +326,9 @@ module Statement = struct
       input
 
   and while_stat input =
-    ( token "while" >> token "(" >> expression
+    ( token "while" >> parens expression
     >>= fun condition ->
-    token ")" >> statement
-    >>= fun while_body -> return (While (condition, while_body)) )
+    statement >>= fun while_body -> return (While (condition, while_body)) )
       input
 
   and variable_decl input =
@@ -351,18 +350,20 @@ module Statement = struct
       input
 
   and for_stat input =
-    ( token "for" >> token "("
-    >> choice
-         [ (statement >>= fun stat -> return (Some stat))
-         ; token ";" >> return None ]
-    >>= fun declaration ->
-    choice
-      [ (expression >>= fun expr -> token ";" >> return (Some expr))
-      ; token ";" >> return None ]
-    >>= fun condition ->
-    sep_by expression (token ",")
-    >>= fun after_list ->
-    token ")" >> statement
+    ( token "for"
+    >> parens
+         ( choice
+             [ (statement >>= fun stat -> return (Some stat))
+             ; token ";" >> return None ]
+         >>= fun declaration ->
+         choice
+           [ (expression >>= fun expr -> token ";" >> return (Some expr))
+           ; token ";" >> return None ]
+         >>= fun condition ->
+         sep_by expression (token ",")
+         >>= fun after_list -> return (declaration, condition, after_list) )
+    >>= fun (declaration, condition, after_list) ->
+    statement
     >>= fun body -> return (For (declaration, condition, after_list, body)) )
       input
 
@@ -371,6 +372,9 @@ module Statement = struct
 end
 
 module Class = struct
+  open Expression
+  open Statement
+
   let modifier =
     choice
       [ token "public" >> return Public; token "static" >> return Static
@@ -383,12 +387,12 @@ module Class = struct
     = Some [Public; Static; Abstract]
 
   let parameter =
-    Expression.define_type_and_index_option
+    define_type_and_index_option
     >>= fun (parameter_type, parameter_index) ->
     match parameter_index with
     | Some _ -> mzero
     | None ->
-        Expression.identifier
+        identifier
         >>= fun parameter_identifier ->
         return (parameter_type, parameter_identifier)
 
@@ -401,35 +405,33 @@ module Class = struct
   let method_decl =
     many modifier
     >>= fun method_modifier_list ->
-    Expression.define_type_and_index_option
+    define_type_and_index_option
     >>= fun (method_type, method_index) ->
     match method_index with
     | Some _ -> mzero
     | None ->
-        Expression.identifier
+        identifier
         >>= fun method_name ->
-        token "("
-        >> sep_by parameter (token ",")
+        parens (sep_by parameter (token ","))
         >>= fun method_parameter_list ->
-        token ")"
-        >> choice
-             [ ( Statement.statement_block
-               >>= fun method_statement_block ->
-               return
+        choice
+          [ ( statement_block
+            >>= fun method_statement_block ->
+            return
+              (Method
+                 ( method_modifier_list
+                 , method_type
+                 , method_name
+                 , method_parameter_list
+                 , Some method_statement_block )) )
+          ; token ";"
+            >> return
                  (Method
                     ( method_modifier_list
                     , method_type
                     , method_name
                     , method_parameter_list
-                    , Some method_statement_block )) )
-             ; token ";"
-               >> return
-                    (Method
-                       ( method_modifier_list
-                       , method_type
-                       , method_name
-                       , method_parameter_list
-                       , None )) ]
+                    , None )) ]
 
   let%test _ =
     apply method_decl "public int Sum(int a, string b) {}"
@@ -454,17 +456,15 @@ module Class = struct
   let constructor_decl =
     many modifier
     >>= fun constr_modifier_list ->
-    Expression.identifier
+    identifier
     >>= fun constr_name ->
-    token "("
-    >> sep_by parameter (token ",")
+    parens (sep_by parameter (token ","))
     >>= fun constr_parameter_list ->
-    token ")"
-    >> choice
-         [ ( token ":" >> Expression.call_constructor
-           >>= fun constr_name -> return (Some constr_name) ); return None ]
+    choice
+      [ ( token ":" >> call_constructor
+        >>= fun constr_name -> return (Some constr_name) ); return None ]
     >>= fun call_constr_name ->
-    Statement.statement_block
+    statement_block
     >>= fun constr_statement_block ->
     return
       (Constructor
@@ -496,15 +496,15 @@ module Class = struct
 
   let field_decl =
     let variable_decl =
-      Expression.identifier
+      identifier
       >>= fun field_name ->
       choice
-        [ ( token "=" >> Expression.expression
+        [ ( token "=" >> expression
           >>= fun field_value -> return (field_name, Some field_value) )
         ; return (field_name, None) ] in
     many modifier
     >>= fun field_modifier_list ->
-    Expression.define_type_and_index_option
+    define_type_and_index_option
     >>= fun (field_type, field_index) ->
     match field_index with
     | Some _ -> mzero
@@ -531,10 +531,10 @@ module Class = struct
   let class_decl =
     many modifier
     >>= fun class_modifier_list ->
-    token "class" >> Expression.identifier
+    token "class" >> identifier
     >>= fun class_name ->
     choice
-      [ ( token ":" >> Expression.identifier
+      [ ( token ":" >> identifier
         >>= fun class_parent_name -> return (Some class_parent_name) )
       ; return None ]
     >>= fun class_parent_name ->

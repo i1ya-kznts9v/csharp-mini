@@ -1,17 +1,15 @@
 open Csharpmini_lib.Ast
 open Csharpmini_lib.Parser
 
-let list_no_option list = match list with Some x -> x | None -> []
-
 let rec print_list = function
   | [] -> print_string ""
   | hd :: tl ->
-      print_string (show_cs_class hd) ;
+      print_string (show_classes hd) ;
       print_endline "" ;
       print_list tl
 
 let parse_result =
-  list_no_option
+  Option.get
     (apply parser
        {|
 public class Program
