@@ -1,12 +1,8 @@
 open Csharpmini_lib.Ast
 open Csharpmini_lib.Parser
 
-let rec print_list = function
-  | [] -> print_string ""
-  | hd :: tl ->
-      print_string (show_classes hd) ;
-      print_endline "" ;
-      print_list tl
+let print_list =
+  Format.pp_print_list Format.pp_print_string Format.std_formatter
 
 let parse_result =
   Option.get
@@ -103,4 +99,4 @@ public class Child : Person
 }
 |})
 
-let test = print_list parse_result
+let test = print_list (List.map show_classes parse_result)
