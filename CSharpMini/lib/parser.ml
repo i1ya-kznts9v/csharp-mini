@@ -124,7 +124,7 @@ module Expression = struct
   and array_access input =
     ( this <|> parens array_creation <|> base <|> call_method <|> identifier
     >>= fun array_name ->
-    token "[" >> define_array_index
+    token "[" >> define_array_index_null
     >>= fun index ->
     match index with
     | Null -> token "]" >> mzero
@@ -148,7 +148,11 @@ module Expression = struct
 
   and split_by_comma input = sep_by expression (token ",") input
 
-  and define_array_index input =
+  (*Данная функция определяет индекс одномерного массива:
+    1. Если он есть, то возвращает его
+    2. Если его нет, то возвращает Null
+    3. Если это не одномерный массив, то возвращает ошибку*)
+  and define_array_index_null input =
     ( option Null expression
     >>= fun index ->
     many (token ",")
@@ -156,16 +160,35 @@ module Expression = struct
     match List.length commas with 0 -> return index | _ -> mzero )
       input
 
+  (*Данная функция определяет тип любой переменной или экземпляра, причём:
+    1. Если это массив и его размер определён, то она возвращает тип массива и его размер
+    2. Если это массив и его размер не определён, то она возвращает тип массива, но без размера
+    3. Если это не массив, то возвращает тип без размера*)
   and define_type_and_index_option input =
+    (*Здесь происходит проверка, является ли определённый ранее тип - массивом*)
     let check_array t input =
+      (*Ищем [ после типа, чтобы определить, массив ли это:
+        1. Если такого символа нет, то exactly встретила пробел и упала, поэтому возвращаем пробел
+        2. Если такой символ есть, то exactly вернёт его*)
       ( option ' ' (exactly '[')
       >>= fun bracket ->
+      (*Выполняем сопоставление с образцом в зависимости от полученного символа:
+        1. [ -> это массив и мы должны попытаться определить его размер
+        2. _ -> это не массив, определять размер не требуется*)
       match bracket with
       | '[' -> (
-          define_array_index
+          (*Определяем размер массива и проверяем, что он ОДНОМЕРНЫЙ:
+            1. Если он есть, вернётся индекс
+            2. Если его нет, вернётся NULL
+            3. Если массив не одномерный, то вернётся ошибка*)
+          define_array_index_null
           >>= fun index ->
           token "]"
           >>
+          (*Выполняем сопоставление с образцом в зависимости от впервые определённого типа и размера:
+            1. Если это void, то массив такого типа не может быть создан -> ошибка
+            2. Если это любой другой тип и у него есть размер, то возвращаем этот размер
+            3. Если это любой другой тип и у него нет размера, то возвращаем Null*)
           match t with
           | TInt when index != Null -> return (Some index)
           | TString when index != Null -> return (Some index)
@@ -175,14 +198,20 @@ module Expression = struct
           | _ -> return (Some Null) )
       | _ -> return None )
         input in
+    (*Здесь происходит возврат финального типа из данной функции*)
     let type_and_index_decision t input =
       ( check_array t
       >>= fun result ->
+      (*Выполняем сопоставление с образцом в зависимости от определённого размера:
+        1. Если размера нет, то это не массив -> возвращаем впервые определённый тип
+        2. Если размер Null, то возвращаем массив без размера
+        3. Если размер определён, то возвращаем массив с размером*)
       match result with
       | Some Null -> return (TArray t, None)
       | Some index -> return (TArray t, Some index)
       | None -> return (t, None) )
         input in
+    (*Здесь происходит первичное определение типа переменной или экземпляра*)
     (choice
        [ token "int" >> type_and_index_decision TInt
        ; token "string" >> type_and_index_decision TString
@@ -263,8 +292,8 @@ module Expression = struct
     apply define_type_and_index_option "   JetBrains[10]   "
     = Some (TArray (TClass "JetBrains"), Some (Value (VInt 10)))
 
-  let%test _ = apply define_array_index "  14   " = Some (Value (VInt 14))
-  let%test _ = apply define_array_index "  14, 19 ,99 " = None
+  let%test _ = apply define_array_index_null "  14   " = Some (Value (VInt 14))
+  let%test _ = apply define_array_index_null "  14, 19 ,99 " = None
 end
 
 module Statement = struct
