@@ -7,10 +7,29 @@ module Expression = struct
   let parens parser =
     token "(" >> parser >>= fun result -> token ")" >> return result
 
-  let digits = spaces >> many1 digit => implode
-  let integer = digits => int_of_string
+  let reserved =
+    [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
+    ; "int"; "bool"; "string"; "void"; "char"; "null"; "new"; "this"; "base"
+    ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
+    ; "continue"; "brake"; "class" ]
 
-  let%test _ = apply integer " 1901" = Some 1901
+  let ident =
+    spaces >> letter <~> many alpha_num => implode
+    >>= function s when List.mem s reserved -> mzero | s -> return s
+
+  let name = ident >>= fun name -> return (Name name)
+
+  let%test _ = apply name "       JetBrains" = Some (Name "JetBrains")
+  let%test _ = apply name "     abstract" = None
+  let%test _ = apply name "   1lya" = None
+
+  let identifier = ident >>= fun identifier -> return (Identifier identifier)
+
+  let%test _ =
+    apply identifier "       JetBrains" = Some (Identifier "JetBrains")
+
+  let%test _ = apply identifier "     abstract" = None
+  let%test _ = apply identifier "   1lya" = None
 
   let null = token "null" >> return Null
 
@@ -23,6 +42,11 @@ module Expression = struct
   let this = token "this" >> return This
 
   let%test _ = apply this "         this" = Some This
+
+  let digits = spaces >> many1 digit => implode
+  let integer = digits => int_of_string
+
+  let%test _ = apply integer " 1901" = Some 1901
 
   let int_value = integer >>= fun i -> return (Value (VInt i))
 
@@ -48,25 +72,6 @@ module Expression = struct
 
   let false_value = token "false" >> return (Value (VBool false))
   let true_value = token "true" >> return (Value (VBool true))
-
-  let reserved =
-    [ "true"; "false"; "if"; "else"; "for"; "while"; "public"; "const"; "static"
-    ; "int"; "bool"; "string"; "void"; "char"; "null"; "new"; "this"; "base"
-    ; "vitual"; "override"; "abstract"; "namespace"; "using"; "do"; "return"
-    ; "continue"; "brake"; "class" ]
-
-  let ident =
-    spaces >> letter <~> many alpha_num => implode
-    >>= function s when List.mem s reserved -> mzero | s -> return s
-
-  let identifier = ident >>= fun s -> return (Identifier s)
-
-  let%test _ =
-    apply identifier "       JetBrains" = Some (Identifier "JetBrains")
-
-  let%test _ = apply identifier "     abstract" = None
-  let%test _ = apply identifier "   1lya" = None
-
   let add_op = token "+" >> return (fun x y -> Add (x, y))
   let sub_op = token "-" >> return (fun x y -> Sub (x, y))
   let mult_op = token "*" >> return (fun x y -> Mult (x, y))
@@ -80,11 +85,6 @@ module Expression = struct
   let more_or_equal_op = token ">=" >> return (fun x y -> MoreOrEqual (x, y))
   let equal_op = token "==" >> return (fun x y -> Equal (x, y))
   let not_equal_op = token "!=" >> return (fun x y -> NotEqual (x, y))
-
-  let atomic =
-    choice [identifier; int_value; string_value; true_value; false_value; null]
-
-  let%test _ = apply atomic "    false" = Some (Value (VBool false))
 
   (* Functions below this point are arranged in ascending order of priority,
      but inside this functions, priorities are in descending order *)
@@ -121,14 +121,19 @@ module Expression = struct
     <|> atomic )
       input
 
+  and atomic input =
+    (choice
+       [identifier; int_value; string_value; true_value; false_value; null])
+      input
+
   and array_access input =
     ( this <|> parens array_creation <|> base <|> call_method <|> identifier
-    >>= fun array_name ->
+    >>= fun array_identifier ->
     token "[" >> define_array_index_null
     >>= fun index ->
     match index with
     | Null -> token "]" >> mzero
-    | _ -> token "]" >> return (ArrayAccess (array_name, index)) )
+    | _ -> token "]" >> return (ArrayAccess (array_identifier, index)) )
       input
 
   and access_by_point input =
@@ -221,19 +226,19 @@ module Expression = struct
        ; token "void" >> type_and_index_decision TVoid ])
       input
 
-  and call method_name input =
+  and call method_identifier input =
     ( parens split_by_comma
-    >>= fun list_expr -> return (CallMethod (method_name, list_expr)) )
+    >>= fun list_expr -> return (CallMethod (method_identifier, list_expr)) )
       input
 
   and call_constructor input =
-    (this <|> base >>= fun constr_name -> call constr_name) input
+    (this <|> base >>= fun constr_identifier -> call constr_identifier) input
 
   and call_method input =
-    (identifier >>= fun method_name -> call method_name) input
+    (identifier >>= fun method_identifier -> call method_identifier) input
 
   and class_creation input =
-    ( token "new" >> identifier
+    ( token "new" >> name
     >>= fun class_name ->
     parens split_by_comma
     >>= fun list_expr -> return (ClassCreation (class_name, list_expr)) )
@@ -268,6 +273,7 @@ module Expression = struct
 
   (*Priority location is over*)
 
+  let%test _ = apply atomic "    false" = Some (Value (VBool false))
   let%test _ = apply define_type_and_index_option "   string[,,]" = None
   let%test _ = apply define_type_and_index_option "   void[]" = None
 
@@ -361,8 +367,8 @@ module Statement = struct
       input
 
   and variable_decl input =
-    let identifier_and_value =
-      identifier
+    let name_and_value =
+      name
       >>= fun variable_name ->
       token "=" >> expression
       >>= (fun variable_value -> return (variable_name, Some variable_value))
@@ -372,7 +378,7 @@ module Statement = struct
     match variable_index with
     | Some _ -> mzero
     | None ->
-        sep_by1 identifier_and_value (token ",")
+        sep_by1 name_and_value (token ",")
         >>= fun variable_decl_list ->
         token ";" >> return (VariableDecl (variable_type, variable_decl_list))
     )
@@ -421,15 +427,11 @@ module Class = struct
     match parameter_index with
     | Some _ -> mzero
     | None ->
-        identifier
-        >>= fun parameter_identifier ->
-        return (parameter_type, parameter_identifier)
+        name >>= fun parameter_name -> return (parameter_type, parameter_name)
 
   let%test _ =
     apply (sep_by parameter (token ",")) "int a, string b, object o"
-    = Some
-        [ (TInt, Identifier "a"); (TString, Identifier "b")
-        ; (TObject, Identifier "o") ]
+    = Some [(TInt, Name "a"); (TString, Name "b"); (TObject, Name "o")]
 
   let method_decl =
     many modifier
@@ -439,7 +441,7 @@ module Class = struct
     match method_index with
     | Some _ -> mzero
     | None ->
-        identifier
+        name
         >>= fun method_name ->
         parens (sep_by parameter (token ","))
         >>= fun method_parameter_list ->
@@ -468,8 +470,8 @@ module Class = struct
         (Method
            ( [Public]
            , TInt
-           , Identifier "Sum"
-           , [(TInt, Identifier "a"); (TString, Identifier "b")]
+           , Name "Sum"
+           , [(TInt, Name "a"); (TString, Name "b")]
            , Some (StatementBlock []) ))
 
   let%test _ =
@@ -478,21 +480,21 @@ module Class = struct
         (Method
            ( [Public; Abstract]
            , TInt
-           , Identifier "Sum"
-           , [(TInt, Identifier "a"); (TString, Identifier "b")]
+           , Name "Sum"
+           , [(TInt, Name "a"); (TString, Name "b")]
            , None ))
 
   let constructor_decl =
     many modifier
     >>= fun constr_modifier_list ->
-    identifier
+    name
     >>= fun constr_name ->
     parens (sep_by parameter (token ","))
     >>= fun constr_parameter_list ->
     choice
       [ ( token ":" >> call_constructor
-        >>= fun constr_name -> return (Some constr_name) ); return None ]
-    >>= fun call_constr_name ->
+        >>= fun call_constr -> return (Some call_constr) ); return None ]
+    >>= fun call_constr ->
     statement_block
     >>= fun constr_statement_block ->
     return
@@ -500,32 +502,28 @@ module Class = struct
          ( constr_modifier_list
          , constr_name
          , constr_parameter_list
-         , call_constr_name
+         , call_constr
          , constr_statement_block ))
 
   let%test _ =
     apply constructor_decl "public Win(object o) {}"
     = Some
         (Constructor
-           ( [Public]
-           , Identifier "Win"
-           , [(TObject, Identifier "o")]
-           , None
-           , StatementBlock [] ))
+           ([Public], Name "Win", [(TObject, Name "o")], None, StatementBlock []))
 
   let%test _ =
     apply constructor_decl "public Win(object o, string m) : base(m) {}"
     = Some
         (Constructor
            ( [Public]
-           , Identifier "Win"
-           , [(TObject, Identifier "o"); (TString, Identifier "m")]
+           , Name "Win"
+           , [(TObject, Name "o"); (TString, Name "m")]
            , Some (CallMethod (Base, [Identifier "m"]))
            , StatementBlock [] ))
 
   let field_decl =
     let variable_decl =
-      identifier
+      name
       >>= fun field_name ->
       choice
         [ ( token "=" >> expression
@@ -545,7 +543,7 @@ module Class = struct
 
   let%test _ =
     apply field_decl "public static int test;"
-    = Some (Field ([Public; Static], TInt, [(Identifier "test", None)]))
+    = Some (Field ([Public; Static], TInt, [(Name "test", None)]))
 
   let%test _ =
     apply field_decl "public const string mega = \"JB\";"
@@ -553,20 +551,20 @@ module Class = struct
         (Field
            ( [Public; Const]
            , TString
-           , [(Identifier "mega", Some (Value (VString "JB")))] ))
+           , [(Name "mega", Some (Value (VString "JB")))] ))
 
   let class_element = field_decl <|> constructor_decl <|> method_decl
 
   let class_decl =
     many modifier
     >>= fun class_modifier_list ->
-    token "class" >> identifier
+    token "class" >> name
     >>= fun class_name ->
     choice
-      [ ( token ":" >> identifier
-        >>= fun class_parent_name -> return (Some class_parent_name) )
+      [ ( token ":" >> name
+        >>= fun parent_class_name -> return (Some parent_class_name) )
       ; return None ]
-    >>= fun class_parent_name ->
+    >>= fun parent_class_name ->
     token "{"
     >> sep_by class_element spaces
     >>= fun class_element_list ->
@@ -575,21 +573,17 @@ module Class = struct
          (Class
             ( class_modifier_list
             , class_name
-            , class_parent_name
+            , parent_class_name
             , class_element_list ))
 
   let%test _ =
     apply class_decl "public abstract class JetBrains : Company{}"
     = Some
-        (Class
-           ( [Public; Abstract]
-           , Identifier "JetBrains"
-           , Some (Identifier "Company")
-           , [] ))
+        (Class ([Public; Abstract], Name "JetBrains", Some (Name "Company"), []))
 
   let%test _ =
     apply class_decl "public static class JetBrains\n{}"
-    = Some (Class ([Public; Static], Identifier "JetBrains", None, []))
+    = Some (Class ([Public; Static], Name "JetBrains", None, []))
 end
 
 let parser = many Class.class_decl

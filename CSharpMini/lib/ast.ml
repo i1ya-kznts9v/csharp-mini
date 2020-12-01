@@ -22,6 +22,8 @@ type values =
   | VClass
 [@@deriving show]
 
+type names = Name of string [@@deriving show]
+
 type expressions =
   | Add of expressions * expressions
   | Sub of expressions * expressions
@@ -46,7 +48,7 @@ type expressions =
   | Null
   | Value of values
   | Identifier of string
-  | ClassCreation of expressions * expressions list
+  | ClassCreation of names * expressions list
   | ArrayCreationWithSize of types * expressions
   | ArrayCreationWithElements of types * expressions list
   | CallMethod of expressions * expressions list
@@ -66,25 +68,20 @@ and statements =
   | Continue
   | Return of expressions option
   | Throw of expressions
-  | VariableDecl of types * (expressions * expressions option) list
+  | VariableDecl of types * (names * expressions option) list
 [@@deriving show]
 
 and fields =
-  | Field of modifiers list * types * (expressions * expressions option) list
+  | Field of modifiers list * types * (names * expressions option) list
   | Method of
-      modifiers list
-      * types
-      * expressions
-      * (types * expressions) list
-      * statements option
+      modifiers list * types * names * (types * names) list * statements option
   | Constructor of
       modifiers list
-      * expressions
-      * (types * expressions) list
+      * names
+      * (types * names) list
       * expressions option
       * statements
 [@@deriving show]
 
-and classes =
-  | Class of modifiers list * expressions * expressions option * fields list
+and classes = Class of modifiers list * names * names option * fields list
 [@@deriving show]

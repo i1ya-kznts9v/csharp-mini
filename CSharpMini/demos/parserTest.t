@@ -1,14 +1,14 @@
   $ (cd ../../../../default && demos/parserTest.exe)
   Ast.Class
-  ([Ast.Public], Ast.Identifier ("Program"), None,
+  ([Ast.Public], Ast.Name ("Program"), None,
    [Ast.Method
-    ([Ast.Public; Ast.Static], Ast.TVoid, Ast.Identifier ("Main"),
-     [(Ast.TArray (Ast.TString), Ast.Identifier ("args"))],
+    ([Ast.Public; Ast.Static], Ast.TVoid, Ast.Name ("Main"),
+     [(Ast.TArray (Ast.TString), Ast.Name ("args"))],
      Some (Ast.StatementBlock ([Ast.VariableDecl
                                 (Ast.TClass ("Person"),
-                                 [(Ast.Identifier ("person"),
+                                 [(Ast.Name ("person"),
                                    Some (Ast.ClassCreation
-                                         (Ast.Identifier ("Person"),
+                                         (Ast.Name ("Person"),
                                           [Ast.Value (Ast.VInt (100));
                                            Ast.Value (Ast.VInt (50))])))]);
                                 Ast.Expression (Ast.AccessByPoint
@@ -27,9 +27,9 @@
                                                      []))])));
                                 Ast.VariableDecl
                                 (Ast.TClass ("Child"),
-                                 [(Ast.Identifier ("child"),
+                                 [(Ast.Name ("child"),
                                    Some (Ast.ClassCreation
-                                         (Ast.Identifier ("Child"),
+                                         (Ast.Name ("Child"),
                                           [Ast.Value (Ast.VInt (50));
                                            Ast.Value (Ast.VInt (10))])))]);
                                 Ast.Expression (Ast.AccessByPoint
@@ -52,14 +52,12 @@
                                                  (Ast.Identifier ("TellEvenNumbers"),
                                                   [Ast.Value (Ast.VInt (333))])))])))])
   Ast.Class
-  ([Ast.Public], Ast.Identifier ("Person"), None,
-   [Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Identifier ("weight"), None)]);
-    Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Identifier ("age"), None)]);
+  ([Ast.Public], Ast.Name ("Person"), None,
+   [Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Name ("weight"), None)]);
+    Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Name ("age"), None)]);
     Ast.Constructor
-    ([Ast.Public], Ast.Identifier ("Person"),
-     [(Ast.TInt, Ast.Identifier ("weight"));
-      (Ast.TInt, Ast.Identifier ("age"))],
-     None,
+    ([Ast.Public], Ast.Name ("Person"),
+     [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"))], None,
      Ast.StatementBlock ([Ast.Expression (Ast.Assign
                                           (Ast.AccessByPoint
                                            (Ast.This,
@@ -70,43 +68,42 @@
                                            (Ast.This, Ast.Identifier ("age")),
                                            Ast.Identifier ("age")))]));
     Ast.Method
-    ([Ast.Public], Ast.TInt, Ast.Identifier ("GetWeight"), [],
+    ([Ast.Public], Ast.TInt, Ast.Name ("GetWeight"), [],
      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("weight")))])));
     Ast.Method
-    ([Ast.Public], Ast.TVoid, Ast.Identifier ("SetWeight"),
-     [(Ast.TInt, Ast.Identifier ("weight"))],
+    ([Ast.Public], Ast.TVoid, Ast.Name ("SetWeight"),
+     [(Ast.TInt, Ast.Name ("weight"))],
      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
                                                 (Ast.AccessByPoint
                                                  (Ast.This,
                                                   Ast.Identifier ("weight")),
                                                  Ast.Identifier ("weight")))])));
     Ast.Method
-    ([Ast.Public], Ast.TInt, Ast.Identifier ("GetAge"), [],
+    ([Ast.Public], Ast.TInt, Ast.Name ("GetAge"), [],
      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("age")))])));
     Ast.Method
-    ([Ast.Public], Ast.TVoid, Ast.Identifier ("SetAge"),
-     [(Ast.TInt, Ast.Identifier ("age"))],
+    ([Ast.Public], Ast.TVoid, Ast.Name ("SetAge"),
+     [(Ast.TInt, Ast.Name ("age"))],
      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
                                                 (Ast.AccessByPoint
                                                  (Ast.This,
                                                   Ast.Identifier ("age")),
                                                  Ast.Identifier ("age")))])))])
   Ast.Class
-  ([Ast.Public], Ast.Identifier ("Child"), Some (Ast.Identifier ("Person")),
-   [Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Identifier ("cash"), None)]);
+  ([Ast.Public], Ast.Name ("Child"), Some (Ast.Name ("Person")),
+   [Ast.Field ([Ast.Public], Ast.TInt, [(Ast.Name ("cash"), None)]);
     Ast.Constructor
-    ([Ast.Public], Ast.Identifier ("Child"),
-     [(Ast.TInt, Ast.Identifier ("weight"));
-      (Ast.TInt, Ast.Identifier ("age"))],
+    ([Ast.Public], Ast.Name ("Child"),
+     [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"))],
      Some (Ast.CallMethod
            (Ast.Base, [Ast.Identifier ("weight"); Ast.Identifier ("age")])),
      Ast.StatementBlock ([Ast.Expression (Ast.Assign
                                           (Ast.Identifier ("cash"),
                                            Ast.Value (Ast.VInt (0))))]));
     Ast.Constructor
-    ([Ast.Public], Ast.Identifier ("Child"),
-     [(Ast.TInt, Ast.Identifier ("weight"));
-      (Ast.TInt, Ast.Identifier ("age")); (Ast.TInt, Ast.Identifier ("cash"))],
+    ([Ast.Public], Ast.Name ("Child"),
+     [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"));
+      (Ast.TInt, Ast.Name ("cash"))],
      Some (Ast.CallMethod
            (Ast.This, [Ast.Identifier ("weight"); Ast.Identifier ("age")])),
      Ast.StatementBlock ([Ast.Expression (Ast.Assign
@@ -114,23 +111,23 @@
                                            (Ast.This, Ast.Identifier ("cash")),
                                            Ast.Identifier ("cash")))]));
     Ast.Method
-    ([Ast.Public], Ast.TInt, Ast.Identifier ("GetCash"), [],
+    ([Ast.Public], Ast.TInt, Ast.Name ("GetCash"), [],
      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("cash")))])));
     Ast.Method
-    ([Ast.Public], Ast.TVoid, Ast.Identifier ("SetCash"),
-     [(Ast.TInt, Ast.Identifier ("cash"))],
+    ([Ast.Public], Ast.TVoid, Ast.Name ("SetCash"),
+     [(Ast.TInt, Ast.Name ("cash"))],
      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
                                                 (Ast.AccessByPoint
                                                  (Ast.This,
                                                   Ast.Identifier ("cash")),
                                                  Ast.Identifier ("cash")))])));
     Ast.Method
-    ([Ast.Public], Ast.TVoid, Ast.Identifier ("TellEvenNumbers"),
-     [(Ast.TInt, Ast.Identifier ("count"))],
+    ([Ast.Public], Ast.TVoid, Ast.Name ("TellEvenNumbers"),
+     [(Ast.TInt, Ast.Name ("count"))],
      Some (Ast.StatementBlock ([Ast.For
                                 (Some (Ast.VariableDecl
                                        (Ast.TInt,
-                                        [(Ast.Identifier ("i"),
+                                        [(Ast.Name ("i"),
                                           Some (Ast.Value (Ast.VInt (0))))])),
                                  Some (Ast.Less
                                        (Ast.Identifier ("i"),

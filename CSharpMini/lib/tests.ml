@@ -148,15 +148,14 @@ module Expression = struct
     apply expression "new Car(150,\"Toyota Corolla\")"
     = Some
         (ClassCreation
-           ( Identifier "Car"
-           , [Value (VInt 150); Value (VString "Toyota Corolla")] ))
+           (Name "Car", [Value (VInt 150); Value (VString "Toyota Corolla")]))
 
   let%test _ =
     apply expression "lock(new Mutex(), new String[5])"
     = Some
         (CallMethod
            ( Identifier "lock"
-           , [ ClassCreation (Identifier "Mutex", [])
+           , [ ClassCreation (Name "Mutex", [])
              ; ArrayCreationWithSize (TClass "String", Value (VInt 5)) ] ))
 
   let%test _ =
@@ -164,8 +163,7 @@ module Expression = struct
     = Some
         (AccessByPoint
            ( ClassCreation
-               ( Identifier "Killer"
-               , [Value (VString "John"); Value (VString "Wick")] )
+               (Name "Killer", [Value (VString "John"); Value (VString "Wick")])
            , CallMethod (Identifier "shoot", []) ))
 
   let%test _ =
@@ -183,16 +181,16 @@ module Statement = struct
     = Some
         (VariableDecl
            ( TInt
-           , [ (Identifier "a", Some (Value (VInt 0)))
-             ; (Identifier "b", Some (Value (VInt 1))); (Identifier "c", None)
-             ; (Identifier "d", Some (Value (VInt 17))) ] ))
+           , [ (Name "a", Some (Value (VInt 0)))
+             ; (Name "b", Some (Value (VInt 1))); (Name "c", None)
+             ; (Name "d", Some (Value (VInt 17))) ] ))
 
   let%test _ =
     apply statement "int[] array = new int[19 + 1];"
     = Some
         (VariableDecl
            ( TArray TInt
-           , [ ( Identifier "array"
+           , [ ( Name "array"
                , Some
                    (ArrayCreationWithSize
                       (TInt, Add (Value (VInt 19), Value (VInt 1)))) ) ] ))
@@ -204,9 +202,9 @@ module Statement = struct
     = Some
         (VariableDecl
            ( TString
-           , [ (Identifier "a", Some (Value (VString "a")))
-             ; (Identifier "b", Some (Value (VString "1")))
-             ; (Identifier "c", Some (Value (VString "a1"))) ] ))
+           , [ (Name "a", Some (Value (VString "a")))
+             ; (Name "b", Some (Value (VString "1")))
+             ; (Name "c", Some (Value (VString "a1"))) ] ))
 
   let%test _ =
     apply statement "if (x <= 10 * a) ++x;"
@@ -311,9 +309,9 @@ module Statement = struct
            ( Some
                (VariableDecl
                   ( TInt
-                  , [ (Identifier "i", Some (Value (VInt 0)))
-                    ; ( Identifier "j"
-                      , Some (Sub (Identifier "n", Value (VInt 1))) ) ] ))
+                  , [ (Name "i", Some (Value (VInt 0)))
+                    ; (Name "j", Some (Sub (Identifier "n", Value (VInt 1)))) ]
+                  ))
            , Some (MoreOrEqual (Identifier "i", Identifier "j"))
            , [PostInc (Identifier "i"); PostDec (Identifier "j")]
            , StatementBlock
@@ -335,7 +333,7 @@ module Statement = struct
            ( CallMethod (Identifier "Mistake", [])
            , Throw
                (ClassCreation
-                  (Identifier "Exception", [Value (VString "Bad reference")]))
+                  (Name "Exception", [Value (VString "Bad reference")]))
            , None ))
 
   let%test _ = apply statement "for(public int i = 0;;) {i++;}" = None
@@ -344,7 +342,7 @@ end
 module Class = struct
   let%test _ =
     apply field_decl "public static int[] kids;"
-    = Some (Field ([Public; Static], TArray TInt, [(Identifier "kids", None)]))
+    = Some (Field ([Public; Static], TArray TInt, [(Name "kids", None)]))
 
   let%test _ = apply field_decl "public static int[5] kids;" = None
 
@@ -365,16 +363,15 @@ module Class = struct
         (Method
            ( [Public; Virtual]
            , TInt
-           , Identifier "ArraySum"
-           , [(TArray TInt, Identifier "a")]
+           , Name "ArraySum"
+           , [(TArray TInt, Name "a")]
            , Some
                (StatementBlock
-                  [ VariableDecl
-                      (TInt, [(Identifier "sum", Some (Value (VInt 0)))])
+                  [ VariableDecl (TInt, [(Name "sum", Some (Value (VInt 0)))])
                   ; For
                       ( Some
                           (VariableDecl
-                             (TInt, [(Identifier "i", Some (Value (VInt 0)))]))
+                             (TInt, [(Name "i", Some (Value (VInt 0)))]))
                       , Some
                           (Less
                              ( Identifier "i"
@@ -404,8 +401,8 @@ module Class = struct
     = Some
         (Constructor
            ( [Public]
-           , Identifier "Car"
-           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , Name "Car"
+           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
            , None
            , StatementBlock
                [ Expression
@@ -429,8 +426,8 @@ module Class = struct
     = Some
         (Constructor
            ( [Public]
-           , Identifier "Car"
-           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , Name "Car"
+           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
            , Some (CallMethod (Base, [Identifier "wheels"]))
            , StatementBlock
                [ Expression
@@ -454,8 +451,8 @@ module Class = struct
     = Some
         (Constructor
            ( [Public]
-           , Identifier "Car"
-           , [(TInt, Identifier "speed"); (TArray TInt, Identifier "wheels")]
+           , Name "Car"
+           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
            , Some (CallMethod (This, []))
            , StatementBlock
                [ Expression
@@ -510,18 +507,15 @@ module Class = struct
     = Some
         (Class
            ( [Public]
-           , Identifier "JetBrains"
-           , Some (Identifier "Company")
-           , [ Field
-                 ([], TInt, [(Identifier "employees", Some (Value (VInt 1000)))])
+           , Name "JetBrains"
+           , Some (Name "Company")
+           , [ Field ([], TInt, [(Name "employees", Some (Value (VInt 1000)))])
              ; Field
-                 ( []
-                 , TString
-                 , [(Identifier "status", Some (Value (VString "Close")))] )
+                 ([], TString, [(Name "status", Some (Value (VString "Close")))])
              ; Method
                  ( [Public; Override]
                  , TVoid
-                 , Identifier "InviteToJob"
+                 , Name "InviteToJob"
                  , []
                  , Some
                      (StatementBlock
@@ -529,7 +523,7 @@ module Class = struct
              ; Method
                  ( [Public; Override]
                  , TVoid
-                 , Identifier "DismissFromJob"
+                 , Name "DismissFromJob"
                  , []
                  , Some
                      (StatementBlock
@@ -537,7 +531,7 @@ module Class = struct
              ; Method
                  ( [Public; Override]
                  , TVoid
-                 , Identifier "Open"
+                 , Name "Open"
                  , []
                  , Some
                      (StatementBlock
@@ -547,7 +541,7 @@ module Class = struct
              ; Method
                  ( [Public; Override]
                  , TVoid
-                 , Identifier "Close"
+                 , Name "Close"
                  , []
                  , Some
                      (StatementBlock

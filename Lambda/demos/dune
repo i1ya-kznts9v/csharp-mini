@@ -1,0 +1,16 @@
+(env
+ (_
+  (flags
+   (:standard -w -26))))
+
+(executable
+ (name demoAO)
+ (modules demoAO)
+ (public_name demoAO)
+ (libraries lambda_lib))
+
+(executable
+ (name demoNO)
+ (modules demoNO)
+ (public_name demoNO)
+ (libraries lambda_lib))
