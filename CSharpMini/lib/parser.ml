@@ -434,8 +434,6 @@ module Class = struct
     = Some [(TInt, Name "a"); (TString, Name "b"); (TObject, Name "o")]
 
   let method_decl =
-    many modifier
-    >>= fun method_modifier_list ->
     define_type_and_index_option
     >>= fun (method_type, method_index) ->
     match method_index with
@@ -450,43 +448,16 @@ module Class = struct
             >>= fun method_statement_block ->
             return
               (Method
-                 ( method_modifier_list
-                 , method_type
+                 ( method_type
                  , method_name
                  , method_parameter_list
                  , Some method_statement_block )) )
           ; token ";"
             >> return
-                 (Method
-                    ( method_modifier_list
-                    , method_type
-                    , method_name
-                    , method_parameter_list
-                    , None )) ]
-
-  let%test _ =
-    apply method_decl "public int Sum(int a, string b) {}"
-    = Some
-        (Method
-           ( [Public]
-           , TInt
-           , Name "Sum"
-           , [(TInt, Name "a"); (TString, Name "b")]
-           , Some (StatementBlock []) ))
-
-  let%test _ =
-    apply method_decl "public abstract int Sum(int a, string b);"
-    = Some
-        (Method
-           ( [Public; Abstract]
-           , TInt
-           , Name "Sum"
-           , [(TInt, Name "a"); (TString, Name "b")]
-           , None ))
+                 (Method (method_type, method_name, method_parameter_list, None))
+          ]
 
   let constructor_decl =
-    many modifier
-    >>= fun constr_modifier_list ->
     name
     >>= fun constr_name ->
     parens (sep_by parameter (token ","))
@@ -499,27 +470,10 @@ module Class = struct
     >>= fun constr_statement_block ->
     return
       (Constructor
-         ( constr_modifier_list
-         , constr_name
+         ( constr_name
          , constr_parameter_list
          , call_constr
          , constr_statement_block ))
-
-  let%test _ =
-    apply constructor_decl "public Win(object o) {}"
-    = Some
-        (Constructor
-           ([Public], Name "Win", [(TObject, Name "o")], None, StatementBlock []))
-
-  let%test _ =
-    apply constructor_decl "public Win(object o, string m) : base(m) {}"
-    = Some
-        (Constructor
-           ( [Public]
-           , Name "Win"
-           , [(TObject, Name "o"); (TString, Name "m")]
-           , Some (CallMethod (Base, [Identifier "m"]))
-           , StatementBlock [] ))
 
   let field_decl =
     let variable_decl =
@@ -529,8 +483,6 @@ module Class = struct
         [ ( token "=" >> expression
           >>= fun field_value -> return (field_name, Some field_value) )
         ; return (field_name, None) ] in
-    many modifier
-    >>= fun field_modifier_list ->
     define_type_and_index_option
     >>= fun (field_type, field_index) ->
     match field_index with
@@ -538,22 +490,57 @@ module Class = struct
     | None ->
         sep_by variable_decl (token ",")
         >>= fun variable_decl_list ->
-        token ";"
-        >> return (Field (field_modifier_list, field_type, variable_decl_list))
+        token ";" >> return (Field (field_type, variable_decl_list))
+
+  let class_element =
+    many modifier
+    >>= fun class_element_modifier_list ->
+    field_decl <|> constructor_decl <|> method_decl
+    >>= fun class_element -> return (class_element_modifier_list, class_element)
 
   let%test _ =
-    apply field_decl "public static int test;"
-    = Some (Field ([Public; Static], TInt, [(Name "test", None)]))
-
-  let%test _ =
-    apply field_decl "public const string mega = \"JB\";"
+    apply class_element "public int Sum(int a, string b) {}"
     = Some
-        (Field
-           ( [Public; Const]
-           , TString
-           , [(Name "mega", Some (Value (VString "JB")))] ))
+        ( [Public]
+        , Method
+            ( TInt
+            , Name "Sum"
+            , [(TInt, Name "a"); (TString, Name "b")]
+            , Some (StatementBlock []) ) )
 
-  let class_element = field_decl <|> constructor_decl <|> method_decl
+  let%test _ =
+    apply class_element "public abstract int Sum(int a, string b);"
+    = Some
+        ( [Public; Abstract]
+        , Method
+            (TInt, Name "Sum", [(TInt, Name "a"); (TString, Name "b")], None) )
+
+  let%test _ =
+    apply class_element "public Win(object o) {}"
+    = Some
+        ( [Public]
+        , Constructor
+            (Name "Win", [(TObject, Name "o")], None, StatementBlock []) )
+
+  let%test _ =
+    apply class_element "public Win(object o, string m) : base(m) {}"
+    = Some
+        ( [Public]
+        , Constructor
+            ( Name "Win"
+            , [(TObject, Name "o"); (TString, Name "m")]
+            , Some (CallMethod (Base, [Identifier "m"]))
+            , StatementBlock [] ) )
+
+  let%test _ =
+    apply class_element "public static int test;"
+    = Some ([Public; Static], Field (TInt, [(Name "test", None)]))
+
+  let%test _ =
+    apply class_element "public const string mega = \"JB\";"
+    = Some
+        ( [Public; Const]
+        , Field (TString, [(Name "mega", Some (Value (VString "JB")))]) )
 
   let class_decl =
     many modifier

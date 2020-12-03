@@ -72,16 +72,13 @@ and statements =
 [@@deriving show]
 
 and fields =
-  | Field of modifiers list * types * (names * expressions option) list
-  | Method of
-      modifiers list * types * names * (types * names) list * statements option
+  | Field of types * (names * expressions option) list
+  | Method of types * names * (types * names) list * statements option
   | Constructor of
-      modifiers list
-      * names
-      * (types * names) list
-      * expressions option
-      * statements
+      names * (types * names) list * expressions option * statements
 [@@deriving show]
 
-and classes = Class of modifiers list * names * names option * fields list
+and classes =
+  | Class of
+      modifiers list * names * names option * (modifiers list * fields) list
 [@@deriving show]

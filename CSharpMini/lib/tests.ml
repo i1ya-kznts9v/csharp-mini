@@ -341,13 +341,13 @@ end
 
 module Class = struct
   let%test _ =
-    apply field_decl "public static int[] kids;"
-    = Some (Field ([Public; Static], TArray TInt, [(Name "kids", None)]))
+    apply class_element "public static int[] kids;"
+    = Some ([Public; Static], Field (TArray TInt, [(Name "kids", None)]))
 
-  let%test _ = apply field_decl "public static int[5] kids;" = None
+  let%test _ = apply class_element "public static int[5] kids;" = None
 
   let%test _ =
-    apply method_decl
+    apply class_element
       {|
       public virtual int ArraySum (int[] a)
       { 
@@ -360,37 +360,37 @@ module Class = struct
       }
       |}
     = Some
-        (Method
-           ( [Public; Virtual]
-           , TInt
-           , Name "ArraySum"
-           , [(TArray TInt, Name "a")]
-           , Some
-               (StatementBlock
-                  [ VariableDecl (TInt, [(Name "sum", Some (Value (VInt 0)))])
-                  ; For
-                      ( Some
-                          (VariableDecl
-                             (TInt, [(Name "i", Some (Value (VInt 0)))]))
-                      , Some
-                          (Less
-                             ( Identifier "i"
-                             , AccessByPoint
-                                 ( Identifier "a"
-                                 , CallMethod (Identifier "Length", []) ) ))
-                      , [PostInc (Identifier "i")]
-                      , StatementBlock
-                          [ Expression
-                              (Assign
-                                 ( Identifier "sum"
-                                 , Add
-                                     ( Identifier "sum"
-                                     , ArrayAccess
-                                         (Identifier "a", Identifier "i") ) ))
-                          ] ); Return (Some (Identifier "sum")) ]) ))
+        ( [Public; Virtual]
+        , Method
+            ( TInt
+            , Name "ArraySum"
+            , [(TArray TInt, Name "a")]
+            , Some
+                (StatementBlock
+                   [ VariableDecl (TInt, [(Name "sum", Some (Value (VInt 0)))])
+                   ; For
+                       ( Some
+                           (VariableDecl
+                              (TInt, [(Name "i", Some (Value (VInt 0)))]))
+                       , Some
+                           (Less
+                              ( Identifier "i"
+                              , AccessByPoint
+                                  ( Identifier "a"
+                                  , CallMethod (Identifier "Length", []) ) ))
+                       , [PostInc (Identifier "i")]
+                       , StatementBlock
+                           [ Expression
+                               (Assign
+                                  ( Identifier "sum"
+                                  , Add
+                                      ( Identifier "sum"
+                                      , ArrayAccess
+                                          (Identifier "a", Identifier "i") ) ))
+                           ] ); Return (Some (Identifier "sum")) ]) ) )
 
   let%test _ =
-    apply constructor_decl
+    apply class_element
       {|
       public Car(int speed, int[] wheels)
       {
@@ -399,23 +399,23 @@ module Class = struct
       }
       |}
     = Some
-        (Constructor
-           ( [Public]
-           , Name "Car"
-           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
-           , None
-           , StatementBlock
-               [ Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "speed")
-                      , Identifier "speed" ))
-               ; Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "wheels")
-                      , Identifier "wheels" )) ] ))
+        ( [Public]
+        , Constructor
+            ( Name "Car"
+            , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
+            , None
+            , StatementBlock
+                [ Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "speed")
+                       , Identifier "speed" ))
+                ; Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "wheels")
+                       , Identifier "wheels" )) ] ) )
 
   let%test _ =
-    apply constructor_decl
+    apply class_element
       {|
       public Car(int speed, int[] wheels) : base(wheels)
       {
@@ -424,23 +424,23 @@ module Class = struct
       }
       |}
     = Some
-        (Constructor
-           ( [Public]
-           , Name "Car"
-           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
-           , Some (CallMethod (Base, [Identifier "wheels"]))
-           , StatementBlock
-               [ Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "speed")
-                      , Identifier "speed" ))
-               ; Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "wheels")
-                      , Identifier "wheels" )) ] ))
+        ( [Public]
+        , Constructor
+            ( Name "Car"
+            , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
+            , Some (CallMethod (Base, [Identifier "wheels"]))
+            , StatementBlock
+                [ Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "speed")
+                       , Identifier "speed" ))
+                ; Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "wheels")
+                       , Identifier "wheels" )) ] ) )
 
   let%test _ =
-    apply constructor_decl
+    apply class_element
       {|
       public Car(int speed, int[] wheels) : this()
       {
@@ -449,20 +449,20 @@ module Class = struct
       }
       |}
     = Some
-        (Constructor
-           ( [Public]
-           , Name "Car"
-           , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
-           , Some (CallMethod (This, []))
-           , StatementBlock
-               [ Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "speed")
-                      , Identifier "speed" ))
-               ; Expression
-                   (Assign
-                      ( AccessByPoint (This, Identifier "wheels")
-                      , Identifier "wheels" )) ] ))
+        ( [Public]
+        , Constructor
+            ( Name "Car"
+            , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]
+            , Some (CallMethod (This, []))
+            , StatementBlock
+                [ Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "speed")
+                       , Identifier "speed" ))
+                ; Expression
+                    (Assign
+                       ( AccessByPoint (This, Identifier "wheels")
+                       , Identifier "wheels" )) ] ) )
 
   let%test _ =
     apply constructor_decl
@@ -509,44 +509,47 @@ module Class = struct
            ( [Public]
            , Name "JetBrains"
            , Some (Name "Company")
-           , [ Field ([], TInt, [(Name "employees", Some (Value (VInt 1000)))])
-             ; Field
-                 ([], TString, [(Name "status", Some (Value (VString "Close")))])
-             ; Method
-                 ( [Public; Override]
-                 , TVoid
-                 , Name "InviteToJob"
-                 , []
-                 , Some
-                     (StatementBlock
-                        [Expression (PostInc (Identifier "employees"))]) )
-             ; Method
-                 ( [Public; Override]
-                 , TVoid
-                 , Name "DismissFromJob"
-                 , []
-                 , Some
-                     (StatementBlock
-                        [Expression (PostDec (Identifier "employees"))]) )
-             ; Method
-                 ( [Public; Override]
-                 , TVoid
-                 , Name "Open"
-                 , []
-                 , Some
-                     (StatementBlock
-                        [ Expression
-                            (Assign (Identifier "status", Value (VString "Open")))
-                        ]) )
-             ; Method
-                 ( [Public; Override]
-                 , TVoid
-                 , Name "Close"
-                 , []
-                 , Some
-                     (StatementBlock
-                        [ Expression
-                            (Assign
-                               (Identifier "status", Value (VString "Close")))
-                        ]) ) ] ))
+           , [ ([], Field (TInt, [(Name "employees", Some (Value (VInt 1000)))]))
+             ; ( []
+               , Field
+                   (TString, [(Name "status", Some (Value (VString "Close")))])
+               )
+             ; ( [Public; Override]
+               , Method
+                   ( TVoid
+                   , Name "InviteToJob"
+                   , []
+                   , Some
+                       (StatementBlock
+                          [Expression (PostInc (Identifier "employees"))]) ) )
+             ; ( [Public; Override]
+               , Method
+                   ( TVoid
+                   , Name "DismissFromJob"
+                   , []
+                   , Some
+                       (StatementBlock
+                          [Expression (PostDec (Identifier "employees"))]) ) )
+             ; ( [Public; Override]
+               , Method
+                   ( TVoid
+                   , Name "Open"
+                   , []
+                   , Some
+                       (StatementBlock
+                          [ Expression
+                              (Assign
+                                 (Identifier "status", Value (VString "Open")))
+                          ]) ) )
+             ; ( [Public; Override]
+               , Method
+                   ( TVoid
+                   , Name "Close"
+                   , []
+                   , Some
+                       (StatementBlock
+                          [ Expression
+                              (Assign
+                                 (Identifier "status", Value (VString "Close")))
+                          ]) ) ) ] ))
 end
