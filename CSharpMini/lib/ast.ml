@@ -1,5 +1,5 @@
 type modifiers = Static | Public | Const | Virtual | Override | Abstract
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 type types =
   | TInt
@@ -8,7 +8,7 @@ type types =
   | TClass of string
   | TArray of types
   | TObject
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 type values =
   | VInt of int
@@ -20,9 +20,9 @@ type values =
   | VNull
   | VObject
   | VClass
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
-type names = Name of string [@@deriving show]
+type names = Name of string [@@deriving show {with_path= false}]
 
 type expressions =
   | Add of expressions * expressions
@@ -55,7 +55,7 @@ type expressions =
   | AccessByPoint of expressions * expressions
   | ArrayAccess of expressions * expressions
   | Assign of expressions * expressions
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 and statements =
   | Expression of expressions
@@ -69,16 +69,16 @@ and statements =
   | Return of expressions option
   | Throw of expressions
   | VariableDecl of types * (names * expressions option) list
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 and fields =
   | Field of types * (names * expressions option) list
   | Method of types * names * (types * names) list * statements option
   | Constructor of
       names * (types * names) list * expressions option * statements
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 and classes =
   | Class of
       modifiers list * names * names option * (modifiers list * fields) list
-[@@deriving show]
+[@@deriving show {with_path= false}]
