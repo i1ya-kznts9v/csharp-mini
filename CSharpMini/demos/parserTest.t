@@ -1,167 +1,142 @@
   $ (cd ../../../../default && demos/parserTest.exe)
-  Ast.Class
-  ([Ast.Public], Ast.Name ("Program"), None,
-   [([Ast.Public; Ast.Static],
-     Ast.Method
-     (Ast.TVoid, Ast.Name ("Main"),
-      [(Ast.TArray (Ast.TString), Ast.Name ("args"))],
-      Some (Ast.StatementBlock ([Ast.VariableDecl
-                                 (Ast.TClass ("Person"),
-                                  [(Ast.Name ("person"),
-                                    Some (Ast.ClassCreation
-                                          (Ast.Name ("Person"),
-                                           [Ast.Value (Ast.VInt (100));
-                                            Ast.Value (Ast.VInt (50))])))]);
-                                 Ast.Expression (Ast.AccessByPoint
-                                                 (Ast.Identifier ("person"),
-                                                  Ast.CallMethod
-                                                  (Ast.Identifier ("SetAge"),
-                                                   [Ast.Value (Ast.VInt (45))])));
-                                 Ast.Expression (Ast.AccessByPoint
-                                                 (Ast.Identifier ("Console"),
-                                                  Ast.CallMethod
-                                                  (Ast.Identifier ("WriteLine"),
-                                                   [Ast.AccessByPoint
-                                                    (Ast.Identifier ("person"),
-                                                     Ast.CallMethod
-                                                     (Ast.Identifier ("GetAge"),
-                                                      []))])));
-                                 Ast.VariableDecl
-                                 (Ast.TClass ("Child"),
-                                  [(Ast.Name ("child"),
-                                    Some (Ast.ClassCreation
-                                          (Ast.Name ("Child"),
-                                           [Ast.Value (Ast.VInt (50));
-                                            Ast.Value (Ast.VInt (10))])))]);
-                                 Ast.Expression (Ast.AccessByPoint
-                                                 (Ast.Identifier ("child"),
-                                                  Ast.CallMethod
-                                                  (Ast.Identifier ("SetCash"),
-                                                   [Ast.Value (Ast.VInt (1000))])));
-                                 Ast.Expression (Ast.AccessByPoint
-                                                 (Ast.Identifier ("Console"),
-                                                  Ast.CallMethod
-                                                  (Ast.Identifier ("WriteLine"),
-                                                   [Ast.AccessByPoint
-                                                    (Ast.Identifier ("child"),
-                                                     Ast.CallMethod
-                                                     (Ast.Identifier ("GetCash"),
-                                                      []))])));
-                                 Ast.Expression (Ast.AccessByPoint
-                                                 (Ast.Identifier ("child"),
-                                                  Ast.CallMethod
-                                                  (Ast.Identifier ("TellEvenNumbers"),
-                                                   [Ast.Value (Ast.VInt (333))])))]))))])
-  Ast.Class
-  ([Ast.Public], Ast.Name ("Person"), None,
-   [([Ast.Public], Ast.Field (Ast.TInt, [(Ast.Name ("weight"), None)]));
-    ([Ast.Public], Ast.Field (Ast.TInt, [(Ast.Name ("age"), None)]));
-    ([Ast.Public],
-     Ast.Constructor
-     (Ast.Name ("Person"),
-      [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"))], 
+  Class
+  ([Public], Name ("Program"), None,
+   [([Public; Static],
+     Method
+     (TVoid, Name ("Main"), [(TArray (TString), Name ("args"))],
+      Some (StatementBlock ([VariableDecl
+                             (TClass ("Person"),
+                              [(Name ("person"),
+                                Some (ClassCreation
+                                      (Name ("Person"),
+                                       [Value (VInt (100)); Value (VInt (50))])))]);
+                             Expression (AccessByPoint
+                                         (Identifier ("person"),
+                                          CallMethod
+                                          (Identifier ("SetAge"),
+                                           [Value (VInt (45))])));
+                             Expression (AccessByPoint
+                                         (Identifier ("Console"),
+                                          CallMethod
+                                          (Identifier ("WriteLine"),
+                                           [AccessByPoint
+                                            (Identifier ("person"),
+                                             CallMethod
+                                             (Identifier ("GetAge"), []))])));
+                             VariableDecl
+                             (TClass ("Child"),
+                              [(Name ("child"),
+                                Some (ClassCreation
+                                      (Name ("Child"),
+                                       [Value (VInt (50)); Value (VInt (10))])))]);
+                             Expression (AccessByPoint
+                                         (Identifier ("child"),
+                                          CallMethod
+                                          (Identifier ("SetCash"),
+                                           [Value (VInt (1000))])));
+                             Expression (AccessByPoint
+                                         (Identifier ("Console"),
+                                          CallMethod
+                                          (Identifier ("WriteLine"),
+                                           [AccessByPoint
+                                            (Identifier ("child"),
+                                             CallMethod
+                                             (Identifier ("GetCash"), []))])));
+                             Expression (AccessByPoint
+                                         (Identifier ("child"),
+                                          CallMethod
+                                          (Identifier ("TellEvenNumbers"),
+                                           [Value (VInt (333))])))]))))])
+  Class
+  ([Public], Name ("Person"), None,
+   [([Public], Field (TInt, [(Name ("weight"), None)]));
+    ([Public], Field (TInt, [(Name ("age"), None)]));
+    ([Public],
+     Constructor
+     (Name ("Person"), [(TInt, Name ("weight")); (TInt, Name ("age"))], 
       None,
-      Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                           (Ast.AccessByPoint
-                                            (Ast.This,
-                                             Ast.Identifier ("weight")),
-                                            Ast.Identifier ("weight")));
-                           Ast.Expression (Ast.Assign
-                                           (Ast.AccessByPoint
-                                            (Ast.This, Ast.Identifier ("age")),
-                                            Ast.Identifier ("age")))])));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TInt, Ast.Name ("GetWeight"), [],
-      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("weight")))]))));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TVoid, Ast.Name ("SetWeight"), [(Ast.TInt, Ast.Name ("weight"))],
-      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                                 (Ast.AccessByPoint
-                                                  (Ast.This,
-                                                   Ast.Identifier ("weight")),
-                                                  Ast.Identifier ("weight")))]))));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TInt, Ast.Name ("GetAge"), [],
-      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("age")))]))));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TVoid, Ast.Name ("SetAge"), [(Ast.TInt, Ast.Name ("age"))],
-      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                                 (Ast.AccessByPoint
-                                                  (Ast.This,
-                                                   Ast.Identifier ("age")),
-                                                  Ast.Identifier ("age")))]))))])
-  Ast.Class
-  ([Ast.Public], Ast.Name ("Child"), Some (Ast.Name ("Person")),
-   [([Ast.Public], Ast.Field (Ast.TInt, [(Ast.Name ("cash"), None)]));
-    ([Ast.Public],
-     Ast.Constructor
-     (Ast.Name ("Child"),
-      [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"))],
-      Some (Ast.CallMethod
-            (Ast.Base, [Ast.Identifier ("weight"); Ast.Identifier ("age")])),
-      Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                           (Ast.Identifier ("cash"),
-                                            Ast.Value (Ast.VInt (0))))])));
-    ([Ast.Public],
-     Ast.Constructor
-     (Ast.Name ("Child"),
-      [(Ast.TInt, Ast.Name ("weight")); (Ast.TInt, Ast.Name ("age"));
-       (Ast.TInt, Ast.Name ("cash"))],
-      Some (Ast.CallMethod
-            (Ast.This, [Ast.Identifier ("weight"); Ast.Identifier ("age")])),
-      Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                           (Ast.AccessByPoint
-                                            (Ast.This, Ast.Identifier ("cash")),
-                                            Ast.Identifier ("cash")))])));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TInt, Ast.Name ("GetCash"), [],
-      Some (Ast.StatementBlock ([Ast.Return (Some (Ast.Identifier ("cash")))]))));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TVoid, Ast.Name ("SetCash"), [(Ast.TInt, Ast.Name ("cash"))],
-      Some (Ast.StatementBlock ([Ast.Expression (Ast.Assign
-                                                 (Ast.AccessByPoint
-                                                  (Ast.This,
-                                                   Ast.Identifier ("cash")),
-                                                  Ast.Identifier ("cash")))]))));
-    ([Ast.Public],
-     Ast.Method
-     (Ast.TVoid, Ast.Name ("TellEvenNumbers"),
-      [(Ast.TInt, Ast.Name ("count"))],
-      Some (Ast.StatementBlock ([Ast.For
-                                 (Some (Ast.VariableDecl
-                                        (Ast.TInt,
-                                         [(Ast.Name ("i"),
-                                           Some (Ast.Value (Ast.VInt (0))))])),
-                                  Some (Ast.Less
-                                        (Ast.Identifier ("i"),
-                                         Ast.Identifier ("count"))),
-                                  [Ast.PostInc (Ast.Identifier ("i"))],
-                                  Ast.StatementBlock ([Ast.If
-                                                       (Ast.And
-                                                        (Ast.Equal
-                                                         (Ast.Mod
-                                                          (Ast.Identifier ("i"),
-                                                           Ast.Value (Ast.VInt (2))),
-                                                          Ast.Value (Ast.VInt (0))),
-                                                         Ast.Not (Ast.Equal
-                                                                  (Ast.Mod
-                                                                   (Ast.Identifier ("i"),
-                                                                    Ast.Value (
-                                                                     Ast.VInt (2))),
-                                                                   Ast.Value (
-                                                                    Ast.VInt (1))))),
-                                                        Ast.StatementBlock (
-                                                         [Ast.Expression (
-                                                           Ast.AccessByPoint
-                                                           (Ast.Identifier ("Console"),
-                                                            Ast.CallMethod
-                                                            (Ast.Identifier ("WriteLine"),
-                                                             [Ast.Identifier ("i")])))]),
-                                                        Some (Ast.StatementBlock (
-                                                               [Ast.Continue])))]))]))))])
+      StatementBlock ([Expression (Assign
+                                   (AccessByPoint (This, Identifier ("weight")),
+                                    Identifier ("weight")));
+                       Expression (Assign
+                                   (AccessByPoint (This, Identifier ("age")),
+                                    Identifier ("age")))])));
+    ([Public],
+     Method
+     (TInt, Name ("GetWeight"), [],
+      Some (StatementBlock ([Return (Some (Identifier ("weight")))]))));
+    ([Public],
+     Method
+     (TVoid, Name ("SetWeight"), [(TInt, Name ("weight"))],
+      Some (StatementBlock ([Expression (Assign
+                                         (AccessByPoint
+                                          (This, Identifier ("weight")),
+                                          Identifier ("weight")))]))));
+    ([Public],
+     Method
+     (TInt, Name ("GetAge"), [],
+      Some (StatementBlock ([Return (Some (Identifier ("age")))]))));
+    ([Public],
+     Method
+     (TVoid, Name ("SetAge"), [(TInt, Name ("age"))],
+      Some (StatementBlock ([Expression (Assign
+                                         (AccessByPoint
+                                          (This, Identifier ("age")),
+                                          Identifier ("age")))]))))])
+  Class
+  ([Public], Name ("Child"), Some (Name ("Person")),
+   [([Public], Field (TInt, [(Name ("cash"), None)]));
+    ([Public],
+     Constructor
+     (Name ("Child"), [(TInt, Name ("weight")); (TInt, Name ("age"))],
+      Some (CallMethod (Base, [Identifier ("weight"); Identifier ("age")])),
+      StatementBlock ([Expression (Assign
+                                   (Identifier ("cash"), Value (VInt (0))))])));
+    ([Public],
+     Constructor
+     (Name ("Child"),
+      [(TInt, Name ("weight")); (TInt, Name ("age")); (TInt, Name ("cash"))],
+      Some (CallMethod (This, [Identifier ("weight"); Identifier ("age")])),
+      StatementBlock ([Expression (Assign
+                                   (AccessByPoint (This, Identifier ("cash")),
+                                    Identifier ("cash")))])));
+    ([Public],
+     Method
+     (TInt, Name ("GetCash"), [],
+      Some (StatementBlock ([Return (Some (Identifier ("cash")))]))));
+    ([Public],
+     Method
+     (TVoid, Name ("SetCash"), [(TInt, Name ("cash"))],
+      Some (StatementBlock ([Expression (Assign
+                                         (AccessByPoint
+                                          (This, Identifier ("cash")),
+                                          Identifier ("cash")))]))));
+    ([Public],
+     Method
+     (TVoid, Name ("TellEvenNumbers"), [(TInt, Name ("count"))],
+      Some (StatementBlock ([For
+                             (Some (VariableDecl
+                                    (TInt,
+                                     [(Name ("i"), Some (Value (VInt (0))))])),
+                              Some (Less
+                                    (Identifier ("i"), Identifier ("count"))),
+                              [PostInc (Identifier ("i"))],
+                              StatementBlock ([If
+                                               (And
+                                                (Equal
+                                                 (Mod
+                                                  (Identifier ("i"),
+                                                   Value (VInt (2))),
+                                                  Value (VInt (0))),
+                                                 Not (Equal
+                                                      (Mod
+                                                       (Identifier ("i"),
+                                                        Value (VInt (2))),
+                                                       Value (VInt (1))))),
+                                                StatementBlock ([Expression (
+                                                                  AccessByPoint
+                                                                  (Identifier ("Console"),
+                                                                   CallMethod
+                                                                   (Identifier ("WriteLine"),
+                                                                    [Identifier ("i")])))]),
+                                                Some (StatementBlock ([Continue])))]))]))))])
