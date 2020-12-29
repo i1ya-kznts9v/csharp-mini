@@ -1,4 +1,11 @@
-type modifiers = Static | Public | Const | Virtual | Override | Abstract
+type modifiers =
+  | Static
+  | Public
+  | Const
+  | Virtual
+  | Override
+  | Abstract
+  | Sealed
 [@@deriving show {with_path= false}]
 
 type types =
@@ -7,20 +14,22 @@ type types =
   | TString
   | TClass of string
   | TArray of types
-  | TObject
+  | TBool
 [@@deriving show {with_path= false}]
 
 type values =
   | VInt of int
   | VBool of bool
-  | VChar of char
   | VArray of values list
   | VString of string
   | VVoid
-  | VNull
-  | VObject
-  | VClass
+  | VReference of references
 [@@deriving show {with_path= false}]
+
+and field_references =
+  {key: string; field_type: types; field_value: values; is_const: bool}
+
+and references = NullReference | ObjectReference of {class_key: string}
 
 type names = Name of string [@@deriving show {with_path= false}]
 
@@ -67,8 +76,7 @@ and statements =
   | Break
   | Continue
   | Return of expressions option
-  | Throw of expressions
-  | VariableDecl of types * (names * expressions option) list
+  | VariableDecl of modifiers option * types * (names * expressions option) list
 [@@deriving show {with_path= false}]
 
 and fields =

@@ -177,10 +177,11 @@ end
 
 module Statement = struct
   let%test _ =
-    apply statement "int a = 0, b = 1, c, d = 17;"
+    apply statement "const int a = 0, b = 1, c, d = 17;"
     = Some
         (VariableDecl
-           ( TInt
+           ( Some Const
+           , TInt
            , [ (Name "a", Some (Value (VInt 0)))
              ; (Name "b", Some (Value (VInt 1))); (Name "c", None)
              ; (Name "d", Some (Value (VInt 17))) ] ))
@@ -189,7 +190,8 @@ module Statement = struct
     apply statement "int[] array = new int[19 + 1];"
     = Some
         (VariableDecl
-           ( TArray TInt
+           ( None
+           , TArray TInt
            , [ ( Name "array"
                , Some
                    (ArrayCreationWithSize
@@ -201,7 +203,8 @@ module Statement = struct
     apply statement "string a = \"a\", b = \"1\", c = \"a1\";"
     = Some
         (VariableDecl
-           ( TString
+           ( None
+           , TString
            , [ (Name "a", Some (Value (VString "a")))
              ; (Name "b", Some (Value (VString "1")))
              ; (Name "c", Some (Value (VString "a1"))) ] ))
@@ -308,7 +311,8 @@ module Statement = struct
         (For
            ( Some
                (VariableDecl
-                  ( TInt
+                  ( None
+                  , TInt
                   , [ (Name "i", Some (Value (VInt 0)))
                     ; (Name "j", Some (Sub (Identifier "n", Value (VInt 1)))) ]
                   ))
@@ -321,20 +325,6 @@ module Statement = struct
                       , CallMethod
                           (Identifier "WriteLine", [Value (VString "test")]) ))
                ] ))
-
-  let%test _ =
-    apply statement
-      {|
-      if (Mistake())
-        throw new Exception("Bad reference");
-      |}
-    = Some
-        (If
-           ( CallMethod (Identifier "Mistake", [])
-           , Throw
-               (ClassCreation
-                  (Name "Exception", [Value (VString "Bad reference")]))
-           , None ))
 
   let%test _ = apply statement "for(public int i = 0;;) {i++;}" = None
 end
@@ -367,11 +357,12 @@ module Class = struct
             , [(TArray TInt, Name "a")]
             , Some
                 (StatementBlock
-                   [ VariableDecl (TInt, [(Name "sum", Some (Value (VInt 0)))])
+                   [ VariableDecl
+                       (None, TInt, [(Name "sum", Some (Value (VInt 0)))])
                    ; For
                        ( Some
                            (VariableDecl
-                              (TInt, [(Name "i", Some (Value (VInt 0)))]))
+                              (None, TInt, [(Name "i", Some (Value (VInt 0)))]))
                        , Some
                            (Less
                               ( Identifier "i"
@@ -392,14 +383,14 @@ module Class = struct
   let%test _ =
     apply class_element
       {|
-      public Car(int speed, int[] wheels)
+      public sealed Car(int speed, int[] wheels)
       {
         this.speed = speed; 
         this.wheels = wheels;
       }
       |}
     = Some
-        ( [Public]
+        ( [Public; Sealed]
         , Constructor
             ( Name "Car"
             , [(TInt, Name "speed"); (TArray TInt, Name "wheels")]

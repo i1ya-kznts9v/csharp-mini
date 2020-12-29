@@ -35,6 +35,14 @@ module Expression = struct
 
   let%test _ = apply null "          null" = Some Null
 
+  let const = token "const" >> return Const
+
+  let%test _ = apply const "          const" = Some Const
+
+  let sealed = token "sealed" >> return Sealed
+
+  let%test _ = apply sealed "    sealed       " = Some Sealed
+
   let base = token "base" >> return Base
 
   let%test _ = apply base "      base" = Some Base
@@ -145,9 +153,12 @@ module Expression = struct
     let called_parse =
       this <|> base <|> parens class_creation <|> array_access <|> call_method
       <|> identifier in
+    let called_parse_continued =
+      parens class_creation <|> array_access <|> call_method <|> identifier
+    in
     ( called_parse
     >>= fun head ->
-    many1 (token "." >> called_parse)
+    many1 (token "." >> called_parse_continued)
     => fun tl -> List.fold_left fold_accesses head tl )
       input
 
@@ -197,7 +208,6 @@ module Expression = struct
           match t with
           | TInt when index != Null -> return (Some index)
           | TString when index != Null -> return (Some index)
-          | TObject when index != Null -> return (Some index)
           | TClass _ when index != Null -> return (Some index)
           | TVoid -> mzero
           | _ -> return (Some Null) )
@@ -220,7 +230,6 @@ module Expression = struct
     (choice
        [ token "int" >> type_and_index_decision TInt
        ; token "string" >> type_and_index_decision TString
-       ; token "object" >> type_and_index_decision TObject
        ; ( ident
          >>= fun class_name -> type_and_index_decision (TClass class_name) )
        ; token "void" >> type_and_index_decision TVoid ])
@@ -276,9 +285,7 @@ module Expression = struct
   let%test _ = apply atomic "    false" = Some (Value (VBool false))
   let%test _ = apply define_type_and_index_option "   string[,,]" = None
   let%test _ = apply define_type_and_index_option "   void[]" = None
-
-  let%test _ =
-    apply define_type_and_index_option " object" = Some (TObject, None)
+  let%test _ = apply define_type_and_index_option " int" = Some (TInt, None)
 
   let%test _ =
     apply define_type_and_index_option "   Ilya  " = Some (TClass "Ilya", None)
@@ -341,7 +348,7 @@ module Statement = struct
   let rec statement input =
     choice
       [ variable_decl; break_stat; continue_stat; return_stat; if_stat
-      ; while_stat; for_stat; throw_stat; expression_stat; statement_block ]
+      ; while_stat; for_stat; expression_stat; statement_block ]
       input
 
   and if_stat input =
@@ -373,22 +380,37 @@ module Statement = struct
       token "=" >> expression
       >>= (fun variable_value -> return (variable_name, Some variable_value))
       <|> return (variable_name, None) in
-    ( define_type_and_index_option
-    >>= fun (variable_type, variable_index) ->
-    match variable_index with
-    | Some _ -> mzero
-    | None ->
-        sep_by1 name_and_value (token ",")
-        >>= fun variable_decl_list ->
-        token ";" >> return (VariableDecl (variable_type, variable_decl_list))
-    )
+    choice
+      [ ( const
+        >>= fun const ->
+        define_type_and_index_option
+        >>= fun (variable_type, variable_index) ->
+        match variable_index with
+        | Some _ -> mzero
+        | None ->
+            sep_by1 name_and_value (token ",")
+            >>= fun variable_decl_list ->
+            token ";"
+            >> return
+                 (VariableDecl (Some const, variable_type, variable_decl_list))
+        )
+      ; ( define_type_and_index_option
+        >>= fun (variable_type, variable_index) ->
+        match variable_index with
+        | Some _ -> mzero
+        | None ->
+            sep_by1 name_and_value (token ",")
+            >>= fun variable_decl_list ->
+            token ";"
+            >> return (VariableDecl (None, variable_type, variable_decl_list))
+        ) ]
       input
 
   and for_stat input =
     ( token "for"
     >> parens
          ( choice
-             [ (statement >>= fun stat -> return (Some stat))
+             [ (variable_decl >>= fun var_decl -> return (Some var_decl))
              ; token ";" >> return None ]
          >>= fun declaration ->
          choice
@@ -401,9 +423,6 @@ module Statement = struct
     statement
     >>= fun body -> return (For (declaration, condition, after_list, body)) )
       input
-
-  and throw_stat =
-    token "throw" >> expression >>= fun except -> return (Throw except)
 end
 
 module Class = struct
@@ -415,11 +434,11 @@ module Class = struct
       [ token "public" >> return Public; token "static" >> return Static
       ; token "const" >> return Const; token "virtual" >> return Virtual
       ; token "override" >> return Override; token "abstract" >> return Abstract
-      ]
+      ; token "sealed" >> return Sealed ]
 
   let%test _ =
-    apply (many modifier) "public static abstract"
-    = Some [Public; Static; Abstract]
+    apply (many modifier) "public static abstract sealed"
+    = Some [Public; Static; Abstract; Sealed]
 
   let parameter =
     define_type_and_index_option
@@ -430,8 +449,8 @@ module Class = struct
         name >>= fun parameter_name -> return (parameter_type, parameter_name)
 
   let%test _ =
-    apply (sep_by parameter (token ",")) "int a, string b, object o"
-    = Some [(TInt, Name "a"); (TString, Name "b"); (TObject, Name "o")]
+    apply (sep_by parameter (token ",")) "int a, string b, Class o"
+    = Some [(TInt, Name "a"); (TString, Name "b"); (TClass "Class", Name "o")]
 
   let method_decl =
     define_type_and_index_option
@@ -516,19 +535,20 @@ module Class = struct
             (TInt, Name "Sum", [(TInt, Name "a"); (TString, Name "b")], None) )
 
   let%test _ =
-    apply class_element "public Win(object o) {}"
+    apply class_element "public Win(Class o) {}"
     = Some
         ( [Public]
         , Constructor
-            (Name "Win", [(TObject, Name "o")], None, StatementBlock []) )
+            (Name "Win", [(TClass "Class", Name "o")], None, StatementBlock [])
+        )
 
   let%test _ =
-    apply class_element "public Win(object o, string m) : base(m) {}"
+    apply class_element "public Win(Class o, string m) : base(m) {}"
     = Some
         ( [Public]
         , Constructor
             ( Name "Win"
-            , [(TObject, Name "o"); (TString, Name "m")]
+            , [(TClass "Class", Name "o"); (TString, Name "m")]
             , Some (CallMethod (Base, [Identifier "m"]))
             , StatementBlock [] ) )
 

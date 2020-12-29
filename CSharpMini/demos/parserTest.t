@@ -5,7 +5,7 @@
      Method
      (TVoid, Name ("Main"), [(TArray (TString), Name ("args"))],
       Some (StatementBlock ([VariableDecl
-                             (TClass ("Person"),
+                             (None, TClass ("Person"),
                               [(Name ("person"),
                                 Some (ClassCreation
                                       (Name ("Person"),
@@ -24,7 +24,7 @@
                                              CallMethod
                                              (Identifier ("GetAge"), []))])));
                              VariableDecl
-                             (TClass ("Child"),
+                             (None, TClass ("Child"),
                               [(Name ("child"),
                                 Some (ClassCreation
                                       (Name ("Child"),
@@ -116,7 +116,7 @@
      (TVoid, Name ("TellEvenNumbers"), [(TInt, Name ("count"))],
       Some (StatementBlock ([For
                              (Some (VariableDecl
-                                    (TInt,
+                                    (None, TInt,
                                      [(Name ("i"), Some (Value (VInt (0))))])),
                               Some (Less
                                     (Identifier ("i"), Identifier ("count"))),
