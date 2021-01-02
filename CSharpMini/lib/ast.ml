@@ -27,7 +27,11 @@ type values =
 [@@deriving show {with_path= false}]
 
 and field_references =
-  {key: string; field_type: types; field_value: values; is_const: bool}
+  { key: string
+  ; field_type: types
+  ; field_value: values
+  ; is_const: bool
+  ; assigments_count: int }
 
 and references = NullReference | ObjectReference of {class_key: string}
 

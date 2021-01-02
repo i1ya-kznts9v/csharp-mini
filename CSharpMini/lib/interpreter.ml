@@ -129,7 +129,7 @@ module ClassLoader (M : MONADERROR) = struct
       ; constructors_table
       ; children_keys= []
       ; is_abstract= false
-      ; is_sealed= true
+      ; is_sealed= false
       ; parent_key= None
       ; decl_tree=
           Option.get
@@ -159,6 +159,8 @@ module ClassLoader (M : MONADERROR) = struct
     match pair with
     | modifier_list, field_method_constructor -> (
       match field_method_constructor with
+      | Method (_, _, _, _) when is_sealed modifier_list ->
+          error "Methods cannot be sealed"
       | Method (_, _, _, _) when is_const modifier_list ->
           error "Methods cannot be const"
       | Method (_, _, _, _)
@@ -170,16 +172,16 @@ module ClassLoader (M : MONADERROR) = struct
       | Method (_, _, _, _)
         when is_virtual modifier_list && is_override modifier_list ->
           error "Virtual and override - mutually exclusive modifiers"
-      | Method (TVoid, Name "main", [], _)
+      | Method (TVoid, Name "Main", [], _)
         when is_static modifier_list
              && (not (is_abstract modifier_list))
              && (not (is_virtual modifier_list))
              && not (is_override modifier_list) ->
           return ()
-      | Method (_, Name "main", _, _) ->
-          error "Only one main method can be in the program"
+      | Method (_, Name "Main", _, _) ->
+          error "Only one Main method can be in the program"
       | Method (_, _, _, _) when is_static modifier_list ->
-          error "Static methods other than main are not supported"
+          error "Static methods other than Main are not supported"
       | Method (_, _, _, _) -> return ()
       | Field (_, _)
         when (not (is_static modifier_list))
@@ -221,7 +223,7 @@ module ClassLoader (M : MONADERROR) = struct
     let add_to_class_table ht class_to_add =
       match class_to_add with
       | Class
-          (class_modifier_list, Name this_key, class_parent, class_elements_list)
+          (class_modifier_list, Name this_key, class_parent, class_element_list)
         ->
           let methods_table = Hashtbl.create 1024 in
           let fields_table = Hashtbl.create 1024 in
@@ -262,7 +264,15 @@ module ClassLoader (M : MONADERROR) = struct
                     | Some _ -> return ()
                     | None -> error "Body missing in non-abstract method" )
                 in
+                let is_sealed_class = is_sealed class_modifier_list in
                 let is_virtual = is_virtual method_modifier_list in
+                let virtual_in_body =
+                  match is_virtual with
+                  | true -> (
+                    match is_sealed_class with
+                    | true -> error "Virtual method cannot be in sealed class"
+                    | false -> return () )
+                  | false -> return () in
                 let is_override = is_override method_modifier_list in
                 let method_t =
                   { method_type
@@ -273,7 +283,7 @@ module ClassLoader (M : MONADERROR) = struct
                   ; key
                   ; body } in
                 check_modifiers_element element
-                >> is_abstract_body
+                >> virtual_in_body >> is_abstract_body
                 >> add_with_check methods_table key method_t
                      "Method with this type exists"
                 >> return ()
@@ -296,7 +306,11 @@ module ClassLoader (M : MONADERROR) = struct
             | None -> Some "Object"
             | Some _ -> convert_name_to_key parent in
           let is_abstract = is_abstract class_modifier_list in
-          let is_sealed = is_sealed class_modifier_list in
+          let is_static = is_static class_modifier_list in
+          let is_sealed =
+            match is_static with
+            | true -> true
+            | false -> is_sealed class_modifier_list in
           let parent_key = add_parent class_parent in
           let class_t =
             { this_key
@@ -308,7 +322,7 @@ module ClassLoader (M : MONADERROR) = struct
             ; is_sealed
             ; parent_key
             ; decl_tree= class_to_add } in
-          list_map_monerr class_elements_list add_element ()
+          list_map_monerr class_element_list add_element ()
           >> add_with_check ht this_key class_t "This class already exists"
     in
     list_map_monerr class_list (add_to_class_table ht) ht
@@ -325,21 +339,21 @@ module ClassLoader (M : MONADERROR) = struct
 
   let many_update_children_key ht =
     let update : class_t -> class_t M.t =
-     fun class_t ->
-      match class_t.parent_key with
-      | None -> return class_t
+     fun children ->
+      match children.parent_key with
+      | None -> return children
       | Some parent_key -> (
-          let parent_class = get_element_option ht parent_key in
-          match parent_class with
+          let parent = get_element_option ht parent_key in
+          match parent with
           | None -> error "No parent class found"
-          | Some parent when parent.is_sealed = false ->
+          | Some parent when not parent.is_sealed ->
               let new_parent =
                 { parent with
-                  children_keys= class_t.this_key :: parent.children_keys }
+                  children_keys= children.this_key :: parent.children_keys }
               in
               update_element_monerr ht parent_key new_parent
               >> return new_parent
-          | Some _ -> error "Sealed class cannot be inherited" ) in
+          | Some _ -> error "Sealed or static class cannot be inherited" ) in
     list_map_monerr (convert_table_to_list ht) update ht
 
   (*Functions for implementing inheritance*)
@@ -360,17 +374,34 @@ module ClassLoader (M : MONADERROR) = struct
   let is_base_method = function CallMethod (Base, _) -> true | _ -> false
   let is_this_method = function CallMethod (This, _) -> true | _ -> false
 
-  let many_check_constructor class_t =
-    let check_call_constructor : constructor_t -> unit t =
-     fun constructor ->
+  let many_check_parent_constructor parent =
+    let check_call_constructor constructor =
       match constructor.call_constructor with
-      | Some call_constructor ->
-          if is_base_method call_constructor || is_this_method call_constructor
-          then return ()
-          else error "Cannot call method that is not a constructor"
+      | Some call_constructor -> (
+        match is_this_method call_constructor with
+        | true -> return ()
+        | false -> error "The called method must be a constructor of this class"
+        )
       | None -> return () in
     list_map_monerr
-      (convert_table_to_list class_t.constructors_table)
+      (convert_table_to_list parent.constructors_table)
+      check_call_constructor ()
+
+  let many_check_children_constructor children =
+    let check_call_constructor constructor =
+      match constructor.call_constructor with
+      | Some call_constructor -> (
+        match
+          is_this_method call_constructor || is_base_method call_constructor
+        with
+        | true -> return ()
+        | false ->
+            error
+              "The called method must be a constructor of this or parent class"
+        )
+      | None -> return () in
+    list_map_monerr
+      (convert_table_to_list children.constructors_table)
       check_call_constructor ()
 
   let many_method_inheritance parent children =
@@ -384,11 +415,8 @@ module ClassLoader (M : MONADERROR) = struct
                  parent_method)
           else error "Abstract method must be overriden"
       | None when not parent_method.is_abstract ->
-          if parent_method.is_virtual then
-            return
-              (Hashtbl.add children.methods_table parent_method.key
-                 parent_method)
-          else return ()
+          return
+            (Hashtbl.add children.methods_table parent_method.key parent_method)
       | _ -> return () in
     list_map_monerr
       (convert_table_to_list parent.methods_table)
@@ -402,8 +430,14 @@ module ClassLoader (M : MONADERROR) = struct
       | false -> return ()
       | true -> (
         match get_element_option parent.methods_table children_method.key with
-        | None -> error "Override modifier on not overriden method"
-        | _ -> return () ) in
+        | None -> error "Cannot override non-existent method in parent"
+        | Some parent_method -> (
+          match parent_method.is_virtual with
+          | true -> return ()
+          | false ->
+              error
+                "Cannot override non-virtual or non-abstract method in parent" )
+        ) in
     list_map_monerr
       (convert_table_to_list children.methods_table)
       (check_children_method_override parent)
@@ -415,8 +449,8 @@ module ClassLoader (M : MONADERROR) = struct
     many_field_inheritance parent children
     >> many_method_inheritance parent children
     >> many_check_method_override parent children
-    >> many_check_constructor parent
-    >> many_check_constructor children
+    >> many_check_parent_constructor parent
+    >> many_check_children_constructor children
     >>= fun _ -> transfert_on_children ht children
 
   and transfert_on_children ht children =
