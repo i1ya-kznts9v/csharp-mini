@@ -67,6 +67,10 @@ let convert_table_to_list ht =
 
 let get_element_option = Hashtbl.find_opt
 
+let starts_with test_str sub_str =
+  let sub_test_str = String.sub test_str 0 (String.length sub_str) in
+  String.equal sub_test_str sub_str
+
 module ClassLoader (M : MONADERROR) = struct
   open M
   open Class
@@ -481,4 +485,636 @@ module ClassLoader (M : MONADERROR) = struct
         many_update_children_key class_table_without_inheritance
         >>= fun class_table_ready_to_inheritance ->
         inheritance class_table_ready_to_inheritance
+end
+
+module Interpretation (M : MONADERROR) = struct
+  open M
+
+  type variable =
+    { variable_type: types
+    ; variable_key: key_t
+    ; is_const: bool
+    ; assignments_count: int
+    ; variable_value: values
+    ; scope_level: int }
+  [@@deriving show {with_path= false}]
+
+  type context =
+    { current_object: object_references
+    ; variables_table: (key_t, variable) Hashtbl_impr.t
+    ; last_expression_result: values option
+    ; was_break: bool
+    ; was_continue: bool
+    ; was_return: bool
+    ; current_method_type: types
+    ; is_main: bool
+    ; cycles_count: int
+    ; scope_level: int
+    ; is_constructor: bool
+    ; main_context: context option
+    ; objects_created_count: int
+    ; is_creation: bool }
+  [@@deriving show {with_path= false}]
+
+  let context_initialize current_object variables_table =
+    return
+      { current_object
+      ; variables_table
+      ; last_expression_result= None
+      ; was_break= false
+      ; was_continue= false
+      ; was_return= false
+      ; current_method_type= TVoid
+      ; is_main= true
+      ; cycles_count= 0
+      ; scope_level= 0
+      ; is_constructor= false
+      ; main_context= None
+      ; objects_created_count= 0
+      ; is_creation= false }
+
+  let get_main_context current_context =
+    match current_context.main_context with
+    | None -> current_context
+    | Some main_context -> main_context
+
+  let get_object_number = function
+    | NullObjectReference -> error "NullReferenceException"
+    | ObjectReference {class_key= _; field_references_table= _; number= num} ->
+        return num
+
+  let find_class_with_main ht =
+    return
+      (List.find
+         (fun class_t -> Hashtbl.mem class_t.methods_table "Main")
+         (convert_table_to_list ht))
+
+  let rec expressions_type_check : expressions -> context -> types t =
+   fun expression context ->
+    match expression with
+    | Add (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TInt -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TInt -> return TInt
+            | TString -> return TString
+            | _ -> error "Wrong type: must be <int> or <string>" )
+        | TString -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TInt | TString -> return TString
+            | _ -> error "Wrong type: must be <int> or <string>" )
+        | _ -> error "Wrong type: must be <int> or <string>" )
+    | Sub (left, right)
+     |Div (left, right)
+     |Mod (left, right)
+     |Mult (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TInt -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TInt -> return TInt
+            | _ -> error "Wrong type: must be <int>" )
+        | _ -> error "Wrong type: must be <int>" )
+    | PostDec value | PostInc value | PrefDec value | PrefInc value -> (
+        expressions_type_check value context
+        >>= fun value_type ->
+        match value_type with
+        | TInt -> return TInt
+        | _ -> error "Wrong type: must be <int>" )
+    | And (left, right) | Or (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TBool -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TBool -> return TBool
+            | _ -> error "Wrong type: must be <bool>" )
+        | _ -> error "Wrong type: must be <bool>" )
+    | Not value -> (
+        expressions_type_check value context
+        >>= fun value_type ->
+        match value_type with
+        | TBool -> return TBool
+        | _ -> error "Wrong type: must be <bool>" )
+    | Less (left, right)
+     |More (left, right)
+     |LessOrEqual (left, right)
+     |MoreOrEqual (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TInt -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TInt -> return TBool
+            | _ -> error "Wrong type: must be <int>" )
+        | _ -> error "Wrong type: must be <int>" )
+    | Equal (left, right) | NotEqual (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TInt -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TInt -> return TBool
+            | _ -> error "Wrong type: must be <int>" )
+        | TString -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TString -> return TBool
+            | _ -> error "Wrong type: must be <string>" )
+        | TBool -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TBool -> return TBool
+            | _ -> error "Wrong type: must be <bool>" )
+        | TArray left_array_type -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TArray right_array_type when left_array_type = right_array_type ->
+                return TBool
+            | _ -> error "Wrong type: must be <same_types[]>" )
+        | TClass left_class_name -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TClass right_class_name when left_class_name = right_class_name ->
+                return TBool
+            | TClass "null" -> return TBool
+            | _ -> error "Wrong class type" )
+        | _ -> error "Wrong type in equals-expression" )
+    | Null -> return (TClass "null")
+    | This -> (
+      match context.current_object with
+      | ObjectReference {class_key= key; _} -> return (TClass key)
+      | NullObjectReference -> error "Current object is null in context" )
+    | Base -> (
+      match context.current_object with
+      | ObjectReference {class_key= key; _} ->
+          let parent_key =
+            Option.get
+              (Option.get (get_element_option class_table key)).parent_key in
+          return (TClass parent_key)
+      | NullObjectReference -> error "Current object is null in context" )
+    | CallMethod (Base, _) -> return TVoid
+    | CallMethod (This, _) -> return TVoid
+    | CallMethod (Identifier method_name, arguments) ->
+        let current_object_key =
+          match context.current_object with
+          | NullObjectReference -> "null"
+          | ObjectReference {class_key= key; _} -> key in
+        let current_class =
+          Option.get (get_element_option class_table current_object_key) in
+        method_check current_class method_name arguments context
+        >>= fun method_t -> return method_t.method_type
+    | AccessByPoint (object_expression, Identifier field_key) -> (
+        expressions_type_check object_expression context
+        >>= fun object_type ->
+        match object_type with
+        | TClass "null" -> error "NullReferenceException"
+        | TClass class_key -> (
+            let class_t =
+              Option.get (get_element_option class_table class_key) in
+            let field_t = get_element_option class_t.fields_table field_key in
+            match field_t with
+            | None -> error "No such field in class"
+            | Some field_t -> return field_t.field_type )
+        | _ -> error "Wrong type: must be an object of some class" )
+    | AccessByPoint
+        (object_expression, CallMethod (Identifier method_name, arguments)) -> (
+        expressions_type_check object_expression context
+        >>= fun object_type ->
+        match object_type with
+        | TClass "null" -> error "NullReferenceException"
+        | TClass class_key ->
+            let class_t =
+              Option.get (get_element_option class_table class_key) in
+            method_check class_t method_name arguments context
+            >>= fun method_t -> return method_t.method_type
+        | _ -> error "Wrong type: must be an object of some class" )
+    | ArrayAccess (array_expression, index_expression) -> (
+        expressions_type_check index_expression context
+        >>= fun index_type ->
+        match index_type with
+        | TInt -> (
+            expressions_type_check array_expression context
+            >>= fun array_type ->
+            match array_type with
+            | TArray array_type -> return array_type
+            | _ -> error "Wrong type: must be <some_type[]>" )
+        | _ -> error "Wrong type: index must be <int>" )
+    | ArrayCreationWithSize (array_type, size) -> (
+        expressions_type_check size context
+        >>= fun size_type ->
+        match size_type with
+        | TInt -> (
+          match array_type with
+          | TVoid -> error "Wrong type: arrays cannot be <void[]>"
+          | TArray _ ->
+              error "Wrong type: multidimensional arrays are not supported"
+          | _ -> return (TArray array_type) )
+        | _ -> error "Wrong type: size must be <int>" )
+    | ArrayCreationWithElements (array_type, elements) ->
+        let rec elements_check = function
+          | [] -> return (TArray array_type)
+          | element :: tail -> (
+              expressions_type_check element context
+              >>= fun element_type ->
+              match array_type with
+              | TClass array_class_name -> (
+                match element_type with
+                | TClass "null" -> elements_check tail
+                | TClass element_class_name ->
+                    class_assign_check array_class_name element_class_name
+                    >> elements_check tail
+                | _ ->
+                    error
+                      "Wrong type: an element in an array must be the type of \
+                       this array" )
+              | _ ->
+                  if array_type = element_type then elements_check tail
+                  else
+                    error
+                      "Wrong type: an element in an array must be the type of \
+                       this array" ) in
+        elements_check elements
+    | ClassCreation (Name class_name, arguments) -> (
+        let class_t = get_element_option class_table class_name in
+        match class_t with
+        | None -> error "No such class implemented"
+        | Some class_t -> (
+          match arguments with
+          | [] -> return (TClass class_name)
+          | _ ->
+              constructor_check class_t arguments context
+              >> return (TClass class_name) ) )
+    | Identifier key -> (
+        let variable = get_element_option context.variables_table key in
+        match variable with
+        | None -> (
+          match context.current_object with
+          | ObjectReference
+              {class_key= _; field_references_table= field_table; number= _}
+            -> (
+              let field_t = get_element_option field_table key in
+              match field_t with
+              | None -> error "No such variable or field"
+              | Some field_t -> return field_t.field_type )
+          | NullObjectReference -> error "NullReferenceException" )
+        | Some variable -> return variable.variable_type )
+    | Value value -> (
+      match value with
+      | VBool _ -> return TBool
+      | VInt _ -> return TInt
+      | VString _ -> return TString
+      | VObjectReference NullObjectReference -> return (TClass "null")
+      | VObjectReference (ObjectReference {class_key= key; _}) ->
+          return (TClass key)
+      | VArray NullArrayReference -> return (TArray TVoid)
+      | VArray (ArrayReference {array_type= arr_type; _}) ->
+          return (TArray arr_type)
+      | _ -> error "Wrong constant value" )
+    | Assign (left, right) -> (
+        expressions_type_check left context
+        >>= fun left_type ->
+        match left_type with
+        | TVoid -> error "Can't assign anything to <void>"
+        | TClass left_class_key -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TClass "null" -> return (TClass left_class_key)
+            | TClass right_class_key ->
+                class_assign_check left_class_key right_class_key
+            | _ -> error "Wrong assign types" )
+        | TArray (TClass left_class_key) -> (
+            expressions_type_check right context
+            >>= fun right_type ->
+            match right_type with
+            | TArray (TClass right_class_key) ->
+                class_assign_check left_class_key right_class_key
+            | _ -> error "Wrong assign types" )
+        | _ ->
+            expressions_type_check right context
+            >>= fun right_type ->
+            if left_type = right_type then return right_type
+            else error "Wrong assign types" )
+    | _ -> error "Wrong expression"
+
+  and class_type_polymorphism_check left_class_name right_class_name =
+    let rec check_parents class_key =
+      let class_t = Option.get (get_element_option class_table class_key) in
+      if class_t.this_key = left_class_name then true
+      else
+        match class_t.parent_key with
+        | None -> false
+        | Some parent_key -> check_parents parent_key in
+    check_parents right_class_name
+
+  and class_assign_check left_class_key right_class_key =
+    match class_type_polymorphism_check left_class_key right_class_key with
+    | false -> error "Cannot assign the most general type to the least general"
+    | true -> return (TClass right_class_key)
+
+  and constructor_check class_t arguments context =
+    let type_check : int -> types -> key_t -> constructor_t -> bool =
+     fun position argument_type _ constructor_t ->
+      match List.nth_opt constructor_t.arguments position with
+      | None -> false
+      | Some (found_type, _) -> (
+        match argument_type with
+        | TClass "null" -> (
+          match found_type with TClass _ -> true | _ -> false )
+        | TClass class_key -> (
+          match found_type with
+          | TClass found_class_key ->
+              class_type_polymorphism_check found_class_key class_key
+          | _ -> false )
+        | _ -> found_type = argument_type ) in
+    let rec helper ht position arguments context =
+      match Hashtbl.length ht with
+      | 0 -> error "No such constructor implemented"
+      | other -> (
+        match arguments with
+        | [] -> (
+          match other with
+          | 1 -> return (List.hd (convert_table_to_list ht))
+          | _ -> error "Cannot resolve constructor" )
+        | argument :: tail ->
+            expressions_type_check argument context
+            >>= fun argument_type ->
+            helper
+              (Hashtbl_impr.filter ht (type_check position argument_type))
+              (position + 1) tail context ) in
+    helper
+      (Hashtbl_impr.filter class_t.constructors_table (fun _ constructor_t ->
+           List.length constructor_t.arguments = List.length arguments))
+      0 arguments context
+
+  (* and method_check class_t method_name arguments context =
+     let type_check : int -> types -> key_t -> method_t -> bool =
+     fun position argument_type _ method_t ->
+       match List.nth_opt method_t.arguments position with
+       | None -> false
+       | Some (found_type, _) ->
+         (match argument_type with
+         | TClass "null" ->
+           (match found_type with
+           | TClass _ -> true
+           | _ -> false)
+         | TClass class_key ->
+           (match found_type with
+           | TClass found_class_key -> class_type_polymorphism_check found_class_key class_key
+           | _ -> false)
+         | _ -> found_type = argument_type)
+       in
+       let rec helper ht position arguments context =
+         match Hashtbl.length ht with
+         | 0 -> error "No such method implemented"
+         | other ->
+           ( match arguments with
+           | [] ->
+             (match other with
+             | 1 -> return (List.hd (convert_table_to_list ht))
+             | _ ->
+               (Hashtbl_impr.filter ht (fun _ method_t -> starts_with method_t.key method_name)
+               |> fun ht_filtred_by_name -> match Hashtbl.length ht_filtred_by_name with
+               | 1 -> return (List.hd (convert_table_to_list ht_filtred_by_name))
+               | _ -> error "Cannot resolve method")
+           | argument :: tail ->
+             (expressions_type_check argument context >>= fun argument_type ->
+             helper (Hashtbl_impr.filter ht (type_check position argument_type)) (position + 1) tail context))
+         in
+         helper (Hashtbl_impr.filter class_t.methods_table (fun _ method_t -> List.length method_t.arguments = List.length arguments)) 0 arguments context *)
+  and method_check class_t method_name arguments context =
+    Hashtbl_impr.filter class_t.methods_table (fun _ method_t ->
+        starts_with method_t.key method_name)
+    |> fun methods_table_filtred_by_name ->
+    let type_check : int -> types -> key_t -> method_t -> bool =
+     fun position argument_type _ method_t ->
+      match List.nth_opt method_t.arguments position with
+      | None -> false
+      | Some (found_type, _) -> (
+        match argument_type with
+        | TClass "null" -> (
+          match found_type with TClass _ -> true | _ -> false )
+        | TClass class_key -> (
+          match found_type with
+          | TClass found_class_key ->
+              class_type_polymorphism_check found_class_key class_key
+          | _ -> false )
+        | _ -> found_type = argument_type ) in
+    let rec helper ht_filtred_by_argument position arguments context =
+      match Hashtbl.length ht_filtred_by_argument with
+      | 0 -> error "No such method implemented"
+      | other -> (
+        match arguments with
+        | [] -> (
+          match other with
+          | 1 -> return (List.hd (convert_table_to_list ht_filtred_by_argument))
+          | _ -> error "Cannot resolve method" )
+        | argument :: tail ->
+            expressions_type_check argument context
+            >>= fun argument_type ->
+            helper
+              (Hashtbl_impr.filter ht_filtred_by_argument
+                 (type_check position argument_type))
+              (position + 1) tail context ) in
+    helper
+      (Hashtbl_impr.filter methods_table_filtred_by_name (fun _ method_t ->
+           List.length method_t.arguments = List.length arguments))
+      0 arguments context
+
+  let get_int_value = function VInt value -> value | _ -> 0
+  let get_string_value = function VString value -> value | _ -> ""
+  let get_bool_value = function VBool value -> value | _ -> false
+
+  let get_object_value = function
+    | VObjectReference value -> value
+    | _ -> NullObjectReference
+
+  let make_list_of_element element size =
+    let rec helper list size =
+      match size with 0 -> list | x -> helper (element :: list) (x - 1) in
+    helper [] size
+
+  let increment_scope_level context =
+    {context with scope_level= context.scope_level + 1}
+
+  let decrement_scope_level context =
+    {context with scope_level= context.scope_level - 1}
+
+  let rec interpret_statements : statements -> context -> context t =
+   fun statement context ->
+    match statement with
+    | StatementBlock statement_list ->
+        let rec helper : statements list -> context -> context t =
+         fun stat_list ctx ->
+          match stat_list with
+          | [] -> return ctx
+          | stat :: tail -> (
+            match stat with
+            | (Break | Continue | Return _) when tail <> [] ->
+                error "Statemets block contains unreachable code"
+            | _ when ctx.cycles_count >= 1 && ctx.was_break -> return ctx
+            | _ when ctx.cycles_count >= 1 && ctx.was_continue -> return ctx
+            | _ when ctx.was_return -> return ctx
+            | _ ->
+                interpret_statements stat ctx
+                >>= fun new_ctx -> helper tail new_ctx ) in
+        let delete_variable_from_scope : context -> context t =
+         fun ctx ->
+          let delete : key_t -> variable -> unit =
+           fun key variable ->
+            if variable.scope_level <> ctx.scope_level then
+              Hashtbl.remove ctx.variables_table key in
+          Hashtbl.iter delete ctx.variables_table ;
+          return ctx in
+        helper statement_list context
+        >>= fun ctx ->
+        if ctx.is_main then return ctx else delete_variable_from_scope ctx
+    | While (expr, stat) -> (
+        let rec loop st ctx =
+          if ctx.was_break then
+            match st with
+            | StatementBlock _ ->
+                return
+                  (decrement_scope_level
+                     { ctx with
+                       was_break= false
+                     ; cycles_count= ctx.cycles_count - 1 })
+            | _ ->
+                return
+                  {ctx with was_break= false; cycles_count= ctx.cycles_count - 1}
+          else
+            interpret_expressions expr ctx
+            >>= fun new_ctx ->
+            match new_ctx.last_expression_result with
+            | Some (VBool false) -> (
+              match st with
+              | StatementBlock _ ->
+                  return
+                    (decrement_scope_level
+                       {new_ctx with cycles_count= ctx.cycles_count - 1})
+              | _ -> return {new_ctx with cycles_count= ctx.cycles_count - 1} )
+            | Some (VBool true) ->
+                interpret_statements st new_ctx
+                >>= fun new_new_ctx ->
+                if new_new_ctx.was_return then return new_new_ctx
+                else if new_new_ctx.was_continue then
+                  loop st {new_new_ctx with was_continue= false}
+                else loop st new_new_ctx
+            | _ -> error "Wrong expression type for loop <while> condition"
+        in
+        match stat with
+        | StatementBlock _ ->
+            loop stat
+              (increment_scope_level
+                 {context with cycles_count= context.cycles_count + 1})
+        | _ -> loop stat {context with cycles_count= context.cycles_count + 1} )
+    | Break ->
+        if context.cycles_count <= 0 then error "No loop for <break>"
+        else return {context with was_break= true}
+    | Continue ->
+        if context.cycles_count <= 0 then error "No loop for <continue>"
+        else return {context with was_continue= true}
+    | If (expr, stat_body, stat_else) -> (
+        interpret_expressions expr context
+        >>= fun new_ctx ->
+        match new_ctx.last_expression_result with
+        | Some (VBool true) -> (
+          match stat_body with
+          | StatementBlock _ ->
+              interpret_statements stat_body (increment_scope_level new_ctx)
+              >>= fun new_new_ctx -> return (decrement_scope_level new_new_ctx)
+          | _ -> interpret_statements stat_body new_ctx )
+        | Some (VBool false) -> (
+          match stat_else with
+          | Some st_else -> (
+            match st_else with
+            | StatementBlock _ ->
+                interpret_statements st_else (increment_scope_level new_ctx)
+                >>= fun new_new_ctx ->
+                return (decrement_scope_level new_new_ctx)
+            | _ -> interpret_statements st_else new_ctx )
+          | None -> return context )
+        | _ -> error "Wrong expression type in <if> condition" )
+    | For (decl_stat, cond_expr, after_expr, body_stat) ->
+        ( match decl_stat with
+        | None -> return (increment_scope_level context)
+        | Some decl_st ->
+            interpret_statements decl_st (increment_scope_level context) )
+        >>= fun decl_ctx ->
+        let rec loop body_st after_ex ctx =
+          if ctx.was_break then
+            return
+              { ctx with
+                was_break= false
+              ; cycles_count= ctx.cycles_count - 1
+              ; scope_level= ctx.scope_level - 1 }
+          else
+            ( match cond_expr with
+            | None -> return {ctx with last_expression_result= Some (VBool true)}
+            | Some cond_ex -> interpret_expressions cond_ex ctx )
+            >>= fun cond_ctx ->
+            match cond_ctx.last_expression_result with
+            | Some (VBool false) ->
+                return
+                  { cond_ctx with
+                    cycles_count= cond_ctx.cycles_count - 1
+                  ; scope_level= cond_ctx.scope_level - 1 }
+            | Some (VBool true) ->
+                let rec interpret_after_ex expr_list cont =
+                  match expr_list with
+                  | [] -> return cont
+                  | expr :: tail -> (
+                    match expr with
+                    | PostDec _ | PostInc _ | PrefDec _ | PrefInc _
+                     |Assign (_, _)
+                     |CallMethod (_, _)
+                     |AccessByPoint (_, CallMethod (_, _)) ->
+                        interpret_expressions expr cont
+                        >>= fun new_ctx -> interpret_after_ex tail new_ctx
+                    | _ -> error "Wrong expression in after body" ) in
+                interpret_statements body_st cond_ctx
+                >>= fun body_ctx ->
+                if body_ctx.was_return then return body_ctx
+                else if body_ctx.was_continue then
+                  loop body_st after_ex {body_ctx with was_continue= false}
+                else
+                  interpret_after_ex after_ex body_ctx
+                  >>= fun after_ctx -> loop body_st after_ex after_ctx
+            | _ -> error "Wrong expression type in loop <for> condition" in
+        loop body_stat after_expr decl_ctx
+    | Return expr -> (
+      match expr with
+      | None when context.current_method_type = TVoid ->
+          return
+            {context with last_expression_result= Some VVoid; was_return= true}
+      | None -> error "Return value type mismatch"
+      | Some ex ->
+          expressions_type_check ex context
+          >>= fun ex_type ->
+          if ex_type <> context.current_method_type then
+            error "Return value type mismatch"
+          else
+            interpret_expressions ex context
+            >>= fun new_ctx -> return {new_ctx with was_return= true} )
+    | _ -> return context
 end

@@ -20,10 +20,10 @@ type types =
 type values =
   | VInt of int
   | VBool of bool
-  | VArray of values list
+  | VArray of array_references
   | VString of string
   | VVoid
-  | VReference of references
+  | VObjectReference of object_references
 [@@deriving show {with_path= false}]
 
 and field_references =
@@ -33,7 +33,16 @@ and field_references =
   ; is_const: bool
   ; assigments_count: int }
 
-and references = NullReference | ObjectReference of {class_key: string}
+and object_references =
+  | NullObjectReference
+  | ObjectReference of
+      { class_key: string
+      ; field_references_table: (string, field_references) Hashtbl_impr.t
+      ; number: int }
+
+and array_references =
+  | NullArrayReference
+  | ArrayReference of {array_type: types; array_values: values list; number: int}
 
 type names = Name of string [@@deriving show {with_path= false}]
 
