@@ -949,6 +949,14 @@ module Interpretation (M : MONADERROR) = struct
     | VObjectReference value -> value
     | _ -> NullObjectReference
 
+  let get_type_default_value = function
+    | TInt -> VInt 0
+    | TString -> VString ""
+    | TClass _ -> VObjectReference NullObjectReference
+    | TBool -> VBool false
+    | TVoid -> VVoid
+    | TArray _ -> VArray NullArrayReference
+
   let make_list_of_element element size =
     let rec helper list size =
       match size with 0 -> list | x -> helper (element :: list) (x - 1) in
@@ -959,6 +967,15 @@ module Interpretation (M : MONADERROR) = struct
 
   let decrement_scope_level context =
     {context with scope_level= context.scope_level - 1}
+
+  let delete_variable_from_scope : context -> context t =
+   fun ctx ->
+    let delete : key_t -> variable -> unit =
+     fun key variable ->
+      if variable.scope_level = ctx.scope_level then
+        Hashtbl.remove ctx.variables_table key in
+    Hashtbl.iter delete ctx.variables_table ;
+    return ctx
 
   let rec interpret_statements : statements -> context -> context t =
    fun statement context ->
@@ -978,18 +995,11 @@ module Interpretation (M : MONADERROR) = struct
             | _ ->
                 interpret_statements stat ctx
                 >>= fun new_ctx -> helper tail new_ctx ) in
-        let delete_variable_from_scope : context -> context t =
-         fun ctx ->
-          let delete : key_t -> variable -> unit =
-           fun key variable ->
-            if variable.scope_level <> ctx.scope_level then
-              Hashtbl.remove ctx.variables_table key in
-          Hashtbl.iter delete ctx.variables_table ;
-          return ctx in
         helper statement_list context
         >>= fun ctx ->
         if ctx.is_main then return ctx else delete_variable_from_scope ctx
     | While (expr, stat) -> (
+        let was_main = context.is_main in
         let rec loop st ctx =
           if ctx.was_break then
             match st with
@@ -1011,7 +1021,9 @@ module Interpretation (M : MONADERROR) = struct
               | StatementBlock _ ->
                   return
                     (decrement_scope_level
-                       {new_ctx with cycles_count= ctx.cycles_count - 1})
+                       { new_ctx with
+                         cycles_count= ctx.cycles_count - 1
+                       ; is_main= was_main })
               | _ -> return {new_ctx with cycles_count= ctx.cycles_count - 1} )
             | Some (VBool true) ->
                 interpret_statements st new_ctx
@@ -1026,7 +1038,9 @@ module Interpretation (M : MONADERROR) = struct
         | StatementBlock _ ->
             loop stat
               (increment_scope_level
-                 {context with cycles_count= context.cycles_count + 1})
+                 { context with
+                   cycles_count= context.cycles_count + 1
+                 ; is_main= false })
         | _ -> loop stat {context with cycles_count= context.cycles_count + 1} )
     | Break ->
         if context.cycles_count <= 0 then error "No loop for <break>"
@@ -1037,37 +1051,46 @@ module Interpretation (M : MONADERROR) = struct
     | If (expr, stat_body, stat_else) -> (
         interpret_expressions expr context
         >>= fun new_ctx ->
+        let was_main = new_ctx.is_main in
         match new_ctx.last_expression_result with
         | Some (VBool true) -> (
           match stat_body with
           | StatementBlock _ ->
-              interpret_statements stat_body (increment_scope_level new_ctx)
-              >>= fun new_new_ctx -> return (decrement_scope_level new_new_ctx)
+              interpret_statements stat_body
+                (increment_scope_level {new_ctx with is_main= false})
+              >>= fun new_new_ctx ->
+              return
+                (decrement_scope_level {new_new_ctx with is_main= was_main})
           | _ -> interpret_statements stat_body new_ctx )
         | Some (VBool false) -> (
           match stat_else with
           | Some st_else -> (
             match st_else with
             | StatementBlock _ ->
-                interpret_statements st_else (increment_scope_level new_ctx)
+                interpret_statements st_else
+                  (increment_scope_level {new_ctx with is_main= false})
                 >>= fun new_new_ctx ->
-                return (decrement_scope_level new_new_ctx)
+                return
+                  (decrement_scope_level {new_new_ctx with is_main= was_main})
             | _ -> interpret_statements st_else new_ctx )
           | None -> return context )
         | _ -> error "Wrong expression type in <if> condition" )
     | For (decl_stat, cond_expr, after_expr, body_stat) ->
+        let was_main = context.is_main in
         ( match decl_stat with
-        | None -> return (increment_scope_level context)
+        | None -> return (increment_scope_level {context with is_main= false})
         | Some decl_st ->
-            interpret_statements decl_st (increment_scope_level context) )
+            interpret_statements decl_st
+              (increment_scope_level {context with is_main= false}) )
         >>= fun decl_ctx ->
         let rec loop body_st after_ex ctx =
           if ctx.was_break then
-            return
+            delete_variable_from_scope
               { ctx with
                 was_break= false
               ; cycles_count= ctx.cycles_count - 1
-              ; scope_level= ctx.scope_level - 1 }
+              ; scope_level= ctx.scope_level - 1
+              ; is_main= was_main }
           else
             ( match cond_expr with
             | None -> return {ctx with last_expression_result= Some (VBool true)}
@@ -1075,10 +1098,11 @@ module Interpretation (M : MONADERROR) = struct
             >>= fun cond_ctx ->
             match cond_ctx.last_expression_result with
             | Some (VBool false) ->
-                return
+                delete_variable_from_scope
                   { cond_ctx with
                     cycles_count= cond_ctx.cycles_count - 1
-                  ; scope_level= cond_ctx.scope_level - 1 }
+                  ; scope_level= cond_ctx.scope_level - 1
+                  ; is_main= was_main }
             | Some (VBool true) ->
                 let rec interpret_after_ex expr_list cont =
                   match expr_list with
@@ -1092,9 +1116,11 @@ module Interpretation (M : MONADERROR) = struct
                         interpret_expressions expr cont
                         >>= fun new_ctx -> interpret_after_ex tail new_ctx
                     | _ -> error "Wrong expression in after body" ) in
-                interpret_statements body_st cond_ctx
+                interpret_statements body_st
+                  {cond_ctx with scope_level= decl_ctx.scope_level + 1}
                 >>= fun body_ctx ->
-                if body_ctx.was_return then return body_ctx
+                if body_ctx.was_return then
+                  return {body_ctx with is_main= was_main}
                 else if body_ctx.was_continue then
                   loop body_st after_ex {body_ctx with was_continue= false}
                 else
@@ -1116,5 +1142,80 @@ module Interpretation (M : MONADERROR) = struct
           else
             interpret_expressions ex context
             >>= fun new_ctx -> return {new_ctx with was_return= true} )
-    | _ -> return context
+    | Expression expr -> (
+      match expr with
+      | PostDec _ | PostInc _ | PrefDec _ | PrefInc _
+       |CallMethod (_, _)
+       |AccessByPoint (_, CallMethod (_, _))
+       |Assign (_, _) ->
+          interpret_expressions expr context >>= fun new_ctx -> return new_ctx
+      | _ -> error "Wrong expression in statement" )
+    | VariableDecl (modifier, variables_type, variable_list) ->
+        let is_const = function Some Const -> true | _ -> false in
+        let rec helper var_list ctx =
+          match var_list with
+          | [] -> return ctx
+          | (Name var_name, var_expr) :: tail -> (
+            match ctx.current_object with
+            | NullObjectReference ->
+                error "Cannot assign value to variable of null-object"
+            | ObjectReference
+                { class_key= _
+                ; field_references_table= field_ref_table
+                ; number= _ } ->
+                ( if
+                  Hashtbl.mem ctx.variables_table var_name
+                  || Hashtbl.mem field_ref_table var_name
+                then error "Variable with this name is already defined"
+                else
+                  match var_expr with
+                  | None ->
+                      Hashtbl.add ctx.variables_table var_name
+                        { variable_type= variables_type
+                        ; variable_key= var_name
+                        ; is_const= is_const modifier
+                        ; assignments_count= 0
+                        ; variable_value= get_type_default_value variables_type
+                        ; scope_level= ctx.scope_level } ;
+                      return ctx
+                  | Some var_ex -> (
+                      expressions_type_check var_ex ctx
+                      >>= fun var_ex_type ->
+                      let add_variable ve =
+                        interpret_expressions ve ctx
+                        >>= fun ve_ctx ->
+                        Hashtbl.add ve_ctx.variables_table var_name
+                          { variable_type= var_ex_type
+                          ; variable_key= var_name
+                          ; is_const= is_const modifier
+                          ; assignments_count= 1
+                          ; variable_value=
+                              Option.get ve_ctx.last_expression_result
+                          ; scope_level= ve_ctx.scope_level } ;
+                        return ve_ctx in
+                      match var_ex_type with
+                      | TClass "null" -> (
+                        match variables_type with
+                        | TClass _ -> add_variable var_ex
+                        | _ -> error "Wrong assign type in declaration" )
+                      | TClass right_class_key -> (
+                        match variables_type with
+                        | TClass left_class_key ->
+                            class_assign_check left_class_key right_class_key
+                            >>= fun _ -> add_variable var_ex
+                        | _ -> error "Wrong assign type in declaration" )
+                      | TArray (TClass right_class_key) -> (
+                        match variables_type with
+                        | TArray (TClass left_class_key) ->
+                            class_assign_check left_class_key right_class_key
+                            >>= fun _ -> add_variable var_ex
+                        | _ -> error "Wrong assign type in declaration" )
+                      | _ when var_ex_type = variables_type ->
+                          add_variable var_ex
+                      | _ ->
+                          error
+                            ( "Wrong value type for declared variable: "
+                            ^ show_types var_ex_type ) ) )
+                >>= fun new_ctx -> helper tail new_ctx ) in
+        helper variable_list context
 end
