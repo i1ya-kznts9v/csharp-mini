@@ -323,7 +323,8 @@ module Statement = struct
   let return_stat =
     token "return"
     >> choice
-         [ (expression >>= fun ret -> token ";" >> return (Return (Some ret)))
+         [ ( skip_many1 space >> expression
+           >>= fun ret -> token ";" >> return (Return (Some ret)) )
          ; token ";" >> return (Return None) ]
 
   let%test _ = apply return_stat "return;" = Some (Return None)

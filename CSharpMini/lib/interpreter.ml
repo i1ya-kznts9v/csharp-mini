@@ -1,5 +1,8 @@
 open Ast
 open Parser
+open Operators
+open Extractors
+open Hashtbl_impr
 
 module type MONAD = sig
   type 'a t
@@ -511,9 +514,10 @@ module Interpretation (M : MONADERROR) = struct
     ; cycles_count: int
     ; scope_level: int
     ; is_constructor: bool
-    ; main_context: context option
+    ; previous_context: context option
     ; objects_created_count: int
-    ; is_creation: bool }
+    ; is_creation: bool
+    ; constructor_affilation : key_t option }
   [@@deriving show {with_path= false}]
 
   let context_initialize current_object variables_table =
@@ -529,19 +533,10 @@ module Interpretation (M : MONADERROR) = struct
       ; cycles_count= 0
       ; scope_level= 0
       ; is_constructor= false
-      ; main_context= None
+      ; previous_context= None
       ; objects_created_count= 0
-      ; is_creation= false }
-
-  let get_main_context current_context =
-    match current_context.main_context with
-    | None -> current_context
-    | Some main_context -> main_context
-
-  let get_object_number = function
-    | NullObjectReference -> error "NullReferenceException"
-    | ObjectReference {class_key= _; field_references_table= _; number= num} ->
-        return num
+      ; is_creation= false
+      ; constructor_affilation = None }
 
   let find_class_with_main ht =
     return
@@ -941,22 +936,6 @@ module Interpretation (M : MONADERROR) = struct
            List.length method_t.arguments = List.length arguments))
       0 arguments context
 
-  let get_int_value = function VInt value -> value | _ -> 0
-  let get_string_value = function VString value -> value | _ -> ""
-  let get_bool_value = function VBool value -> value | _ -> false
-
-  let get_object_value = function
-    | VObjectReference value -> value
-    | _ -> NullObjectReference
-
-  let get_type_default_value = function
-    | TInt -> VInt 0
-    | TString -> VString ""
-    | TClass _ -> VObjectReference NullObjectReference
-    | TBool -> VBool false
-    | TVoid -> VVoid
-    | TArray _ -> VArray NullArrayReference
-
   let make_list_of_element element size =
     let rec helper list size =
       match size with 0 -> list | x -> helper (element :: list) (x - 1) in
@@ -1218,4 +1197,141 @@ module Interpretation (M : MONADERROR) = struct
                             ^ show_types var_ex_type ) ) )
                 >>= fun new_ctx -> helper tail new_ctx ) in
         helper variable_list context
+
+  and interpret_expressions : expressions -> context -> context t =
+  fun expression context ->
+    let rec evaluate_expression expr ctx =
+      let evaluate_binary_opeation left right operation =
+      interpret_expressions left ctx >>= fun left_ctx ->
+      interpret_expressions right left_ctx >>= fun right_ctx ->
+        let left_value = Option.get left_ctx.last_expression_result in
+        let right_value = Option.get right_ctx.last_expression_result in
+        let new_value = operation left_value right_value in
+        try return {right_ctx with last_expression_result = Some new_value} with
+        | Invalid_argument message -> error message
+        | Division_by_zero -> error "Division by zero"
+      in
+      let evaluate_unary_opeation operand operation =
+      interpret_expressions operand ctx >>= fun operand_ctx ->
+        let operand_value = Option.get operand_ctx.last_expression_result in
+        let new_value = operation operand_value in
+        try return {operand_ctx with last_expression_result = Some new_value} with
+        | Invalid_argument message -> error message
+      in
+      match expr with
+      | Add(left, right) -> evaluate_binary_opeation left right ( ++ )
+      | Sub(left, right) -> evaluate_binary_opeation left right ( -- )
+      | Mult(left, right) -> evaluate_binary_opeation left right ( ** )
+      | Div(left, right) -> evaluate_binary_opeation left right ( // )
+      | Mod(left, right) -> evaluate_binary_opeation left right ( %% )
+      | And(left, right) -> evaluate_binary_opeation left right ( &&& )
+      | Or(left, right) -> evaluate_binary_opeation left right ( ||| )
+      | Not(operand) -> evaluate_unary_opeation operand ( !!! )
+      | Less(left, right) -> evaluate_binary_opeation left right ( <<< )
+      | More(left, right) -> evaluate_binary_opeation left right ( >>> )
+      | LessOrEqual(left, right) -> evaluate_binary_opeation left right ( <<== )
+      | MoreOrEqual(left, right) -> evaluate_binary_opeation left right ( >>== )
+      | Equal(left, right) -> evaluate_binary_opeation left right ( === )
+      | NotEqual(left, right) -> evaluate_binary_opeation left right ( !=! )
+      | Value value -> return {ctx with last_expression_result = Some value}
+      | Identifier identifier ->
+        (match Hashtbl_impr.get_element_option ctx.variables_table identifier with
+        | Some variable -> return {ctx with last_expression_result = Some variable.variable_value}
+        | None -> 
+          ( try get_object_info ctx.current_object |> fun (_, field_references_table, _) ->
+            match get_element_option field_references_table identifier with
+            | Some field -> return {ctx with last_expression_result = Some field.field_value}
+            | None -> error "No such variable or field"
+          with
+          Invalid_argument message | Failure message -> error message))
+      | Null -> return {ctx with last_expression_result= Some (VObjectReference NullObjectReference)}
+      (*Really in constructor?*)
+      | CallMethod(This, arguments) ->
+        if not ctx.is_constructor then error "this(...) call must be in Constructor(...) : this(...)"
+        else
+          (try return (get_object_key ctx.current_object) with
+          | Invalid_argument message -> error message)
+          >>= fun current_class_key -> 
+            let current_class = Option.get (get_element_option class_table current_class_key)
+          in
+          constructor_check current_class arguments ctx >>= fun constructor ->
+            initialize_constructor_block constructor.body current_class
+            >>= fun constructor_body ->
+              initialize_table_with_arguments (Hashtbl.create 100) arguments constructor.arguments ctx
+              >>= fun (var_table, new_ctx) ->
+              interpret_statements constructor_body {new_ctx with variables_table= var_table; is_creation= true}
+              >>= fun new_new_ctx -> return {new_new_ctx with last_expression_result= Some VVoid; variables_table= ctx.variables_table; constructor_affilation = ctx.constructor_affilation; is_creation = true}
+      | CallMethod (Base, arguments) ->
+        (if not ctx.is_constructor then error "base(...) call must be in Constructor(...) : base(...)"
+        else 
+          let current_class_key = Option.get ctx.constructor_affilation in
+          let current_class = Option.get (get_element_option class_table current_class_key)
+          in
+          match current_class.parent_key with
+          | None -> error "Bad base(...) call usage: this class has no parent!"
+          | Some parent_key ->
+            let parent_class = Option.get (get_element_option class_table parent_key)
+            in
+            constructor_check parent_class arguments ctx >>= fun parent_constructor ->
+            initialize_constructor_block parent_constructor.body parent_class >>=
+            fun parent_constructor_body ->
+            initialize_table_with_arguments (Hashtbl.create 100) arguments parent_constructor.arguments ctx 
+            >>= fun (var_table, new_ctx) ->
+            interpret_statements parent_constructor_body {new_ctx with variables_table= var_table; is_creation= true; constructor_affilation = Some parent_key}
+            >>= fun new_new_ctx -> return { new_new_ctx with last_expression_result = Some VVoid; variables_table = ctx.variables_table; is_creation= true; constructor_affilation = ctx.constructor_affilation})
+      | This -> return {ctx with last_expression_result = Some (VObjectReference ctx.current_object)}
+      | AccessByPoint (expr, Identifier field_key) ->
+        (interpret_expressions expr ctx >>= fun expr_ctx ->
+          let obj = Option.get expr_ctx.last_expression_result in
+          match obj with
+          | VObjectReference (ObjectReference {class_key = _; field_references_table= field_ref_table; number = _}) -> 
+            let field = Option.get (get_element_option field_ref_table field_key)
+            in
+            return {expr_ctx with last_expression_result = Some field.field_value} 
+          | _ -> error "Cannot access field of non-object")
+      | AccessByPoint (expr, CallMethod (Identifier method_name, arguments)) ->
+        (interpret_expressions expr ctx >>= fun expr_ctx ->
+          let obj = Option.get (expr_ctx.last_expression_result) in
+          match obj with
+          | VObjectReference obj_ref ->
+            (match obj_ref with
+            | NullObjectReference -> error "NullReferenceException"
+            | ObjectReference {class_key = class_key; field_references_table = _; number = _} ->
+              match get_element_option class_table class_key with
+              | None -> error "No such class to call method"
+              | Some class_t -> method_check class_t method_name arguments expr_ctx >>= fun method_t ->
+                let method_body = Option.get method_t.body in
+                let new_var_table = Hashtbl.create 100
+                in
+                initialize_table_with_arguments new_var_table arguments method_t.arguments expr_ctx
+                >>= fun (new_var_table, new_ctx) -> 
+                interpret_statements method_body
+                {
+                  current_object = obj_ref;
+                  variables_table= new_var_table;
+                  last_expression_result = None;
+                  was_break= false;
+                  was_continue = false;
+                  was_return = false;
+                  current_method_type = method_t.method_type;
+                  is_main = false;
+                  cycles_count = 0;
+                  scope_level = 0;
+                  is_constructor = false;
+                  previous_context = Some ctx;
+                  objects_created_count = ctx.objects_created_count;
+                  is_creation = false;
+                  constructor_affilation = None
+                } >>= fun new_new_ctx ->
+                  return
+                  {
+                    new_ctx with
+                    last_expression_result = new_new_ctx.last_expression_result;
+                    objects_created_count = new_new_ctx.objects_created_count;
+                    is_creation = false
+                  })
+          | _ -> error "Cannot access field of non-object")
+      | CallMethod (Identifier method_name, arguments) ->
+        interpret_expressions (AccessByPoint (This, CallMethod (Identifier method_name, arguments))) ctx
+      |
 end
