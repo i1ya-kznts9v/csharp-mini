@@ -72,8 +72,15 @@ let ( === ) left right =
   | VBool left_value, VBool right_value -> VBool (left_value = right_value)
   | VVoid, VVoid -> VBool true
   | VString left_value, VString right_value -> VBool (left_value = right_value)
-  | VObjectReference left_value, VObjectReference right_value ->
-      VBool (left_value = right_value)
+  | VObjectReference left_value, VObjectReference right_value -> (
+    match (left_value, right_value) with
+    | NullObjectReference, NullObjectReference -> VBool true
+    | NullObjectReference, _ | _, NullObjectReference -> VBool false
+    | ( ObjectReference
+          {class_key= _; field_references_table= _; number= left_number}
+      , ObjectReference
+          {class_key= _; field_references_table= _; number= right_number} ) ->
+        VBool (left_number = right_number) )
   | VArray left_value, VArray right_value -> VBool (left_value = right_value)
   | _ -> raise (Invalid_argument "Wrong types in < == >")
 

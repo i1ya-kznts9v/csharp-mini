@@ -31,7 +31,7 @@ and field_references =
   ; field_type: types
   ; field_value: values
   ; is_const: bool
-  ; assigments_count: int }
+  ; assignments_count: int }
 
 and object_references =
   | NullObjectReference
