@@ -61,6 +61,7 @@ type class_t =
   ; is_sealed: bool
   ; parent_key: key_t option
   ; decl_tree: classes }
+[@@deriving show {with_path= false}]
 
 let convert_name_to_key = function Some (Name x) -> Some x | None -> None
 let convert_table_to_seq = Hashtbl.to_seq_values
@@ -1471,7 +1472,9 @@ module Interpretation (M : MONADERROR) = struct
                 >>= fun result_ctx ->
                 return
                   { new_ctx with
-                    last_expression_result= result_ctx.last_expression_result
+                    last_expression_result=
+                      ( if method_t.method_type = TVoid then VVoid
+                      else result_ctx.last_expression_result )
                   ; objects_created_count= result_ctx.objects_created_count
                   ; is_creation= false } )
           | _ -> error "Cannot access field of non-object" )

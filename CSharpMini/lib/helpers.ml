@@ -37,7 +37,8 @@ let get_array_info = function
     ->
       (arr_type, arr_val, arr_num)
 
-let get_field_list = function Class (_, _, _, f_list) -> List.map snd f_list
+let get_field_list = function
+  | Class (_, _, _, field_list) -> List.map snd field_list
 
 let convert_element_pair_list = function
   | t, p_list -> List.map (fun p -> match p with s, f -> (t, s, f)) p_list
