@@ -465,7 +465,7 @@ module ClassLoader (M : MONADERROR) = struct
         match get_element_option parent.methods_table children_method.key with
         | None -> error "Cannot override non-existent method in parent"
         | Some parent_method -> (
-          match parent_method.is_virtual with
+          match parent_method.is_virtual || parent_method.is_abstract with
           | true -> return ()
           | false ->
               error
@@ -520,80 +520,73 @@ module Interpretation (M : MONADERROR) = struct
   open M
 
   type variable =
-    { variable_type: types
-    ; variable_key: key_t
+    { v_type: types
+    ; v_key: key_t
     ; is_const: bool
-    ; assignments_count: int
-    ; variable_value: values
+    ; assignment_count: int
+    ; v_value: values
     ; scope_level: int }
   [@@deriving show {with_path= false}]
 
-  type flags = WasBreak | WasContinue | WasReturn | NoFlag
+  type signal = WasBreak | WasContinue | WasReturn | NoSignal
   [@@deriving show {with_path= false}]
 
   type context =
-    { current_object: object_references
-    ; variables_table: (key_t, variable) Hashtbl_impr.t
-    ; last_expression_result: values
-    ; runtime_flag: flags
-    ; current_method_type: types
+    { cur_object: object_references
+    ; var_table: (key_t, variable) Hashtbl_impr.t
+    ; last_expr_result: values
+    ; runtime_signal: signal
+    ; curr_method_type: types
     ; is_main_scope: bool
-    ; nested_loops_count: int
+    ; nested_loops_cnt: int
     ; scope_level: int
-    ; current_constructor_key: key_t option
-    ; previous_context: context option
-    ; objects_created_count: int
+    ; cur_constr_key: key_t option
+    ; prev_context: context option
+    ; obj_created_cnt: int
     ; is_creation: bool
-    ; constructor_affilation: key_t option }
+    ; constr_affilation: key_t option }
   [@@deriving show {with_path= false}]
 
-  let context_initialize current_object variables_table =
+  let make_context cur_object var_table =
     return
-      { current_object
-      ; variables_table
-      ; last_expression_result= VVoid
-      ; runtime_flag= NoFlag
-      ; current_method_type= TVoid
+      { cur_object
+      ; var_table
+      ; last_expr_result= VVoid
+      ; runtime_signal= NoSignal
+      ; curr_method_type= TVoid
       ; is_main_scope= true
-      ; nested_loops_count= 0
+      ; nested_loops_cnt= 0
       ; scope_level= 0
-      ; current_constructor_key= None
-      ; previous_context= None
-      ; objects_created_count= 0
+      ; cur_constr_key= None
+      ; prev_context= None
+      ; obj_created_cnt= 0
       ; is_creation= false
-      ; constructor_affilation= None }
+      ; constr_affilation= None }
 
-  let rec fold_left2 func acc list1 list2 =
-    match (list1, list2) with
+  let rec mfold_left2 f acc l1 l2 =
+    match (l1, l2) with
     | [], [] -> return acc
-    | x :: xs, y :: ys ->
-        func acc x y >>= fun result -> fold_left2 func result xs ys
+    | x :: xs, y :: ys -> f acc x y >>= fun res -> mfold_left2 f res xs ys
     | _, _ -> error "Wrong lists for fold_left2"
 
-  let rec fold_right func list acc =
-    match list with
+  let rec mfold_right f l acc =
+    match l with
     | [] -> return acc
-    | x :: xs -> fold_right func xs acc >>= fun result -> func x result
+    | x :: xs -> mfold_right f xs acc >>= fun r -> f x r
 
-  let rec fold_left func acc list =
-    match list with
+  let rec mfold_left f acc l =
+    match l with
     | [] -> return acc
-    | x :: xs -> func acc x >>= fun result -> fold_left func result xs
+    | x :: xs -> f acc x >>= fun r -> mfold_left f r xs
 
-  let get_element ht key =
+  let get_elem_if_present_m ht key =
     match Hashtbl_impr.get_element_option ht key with
     | None -> error "No such element in table"
-    | Some element -> return element
+    | Some el -> return el
 
-  let starts_with test_str sub_str =
-    if String.length sub_str > String.length test_str then false
-    else
-      let sub = String.sub test_str 0 (String.length sub_str) in
-      String.equal sub sub_str
-
-  let object_number obj =
-    try get_object_number obj |> fun num -> return num
-    with Invalid_argument message -> error message
+  let obj_num obj =
+    try get_object_number obj |> fun n -> return n
+    with Invalid_argument m -> error m
 
   let find_class_with_main ht =
     Hashtbl_impr.filter ht (fun _ c -> Hashtbl.mem c.methods_table "Main")
@@ -603,23 +596,29 @@ module Interpretation (M : MONADERROR) = struct
     | 1 -> return (seq_hd (convert_table_to_seq fht))
     | _ -> error "Must be one Main()"
 
-  let rec expressions_type_check expression context class_table =
-    match expression with
+  let startswith test_str sub_str =
+    if String.length sub_str > String.length test_str then false
+    else
+      let sub = String.sub test_str 0 (String.length sub_str) in
+      String.equal sub sub_str
+
+  let rec expr_type_check t_expr ctx class_table =
+    match t_expr with
     | Add (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TInt -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TInt -> return TInt
             | TString -> return TString
             | _ -> error "Wrong type: must be <int> or <string>" )
         | TString -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TInt | TString -> return TString
             | _ -> error "Wrong type: must be <int> or <string>" )
         | _ -> error "Wrong type: must be <int> or <string>" )
@@ -627,347 +626,374 @@ module Interpretation (M : MONADERROR) = struct
      |Div (left, right)
      |Mod (left, right)
      |Mult (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TInt -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TInt -> return TInt
             | _ -> error "Wrong type: must be <int>" )
         | _ -> error "Wrong type: must be <int>" )
     | PostDec value | PostInc value | PrefDec value | PrefInc value -> (
-        expressions_type_check value context class_table
-        >>= fun value_type ->
-        match value_type with
+        expr_type_check value ctx class_table
+        >>= fun vt ->
+        match vt with
         | TInt -> return TInt
         | _ -> error "Wrong type: must be <int>" )
     | And (left, right) | Or (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TBool -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TBool -> return TBool
             | _ -> error "Wrong type: must be <bool>" )
         | _ -> error "Wrong type: must be <bool>" )
     | Not value -> (
-        expressions_type_check value context class_table
-        >>= fun value_type ->
-        match value_type with
+        expr_type_check value ctx class_table
+        >>= fun vt ->
+        match vt with
         | TBool -> return TBool
         | _ -> error "Wrong type: must be <bool>" )
     | Less (left, right)
      |More (left, right)
      |LessOrEqual (left, right)
      |MoreOrEqual (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TInt -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TInt -> return TBool
             | _ -> error "Wrong type: must be <int>" )
         | _ -> error "Wrong type: must be <int>" )
     | Equal (left, right) | NotEqual (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TInt -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TInt -> return TBool
             | _ -> error "Wrong type: must be <int>" )
         | TString -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TString -> return TBool
             | _ -> error "Wrong type: must be <string>" )
         | TBool -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
             | TBool -> return TBool
             | _ -> error "Wrong type: must be <bool>" )
-        | TArray left_array_type -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
-            | TArray right_array_type when left_array_type = right_array_type ->
-                return TBool
+        | TArray arr_lt -> (
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
+            | TArray arr_rt when arr_lt = arr_rt -> return TBool
             | _ -> error "Wrong type: must be <same_types[]>" )
-        | TClass left_class_name -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
-            | TClass right_class_name when left_class_name = right_class_name ->
-                return TBool
+        | TClass ls -> (
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
+            | TClass rs when ls = rs -> return TBool
             | TClass "null" -> return TBool
             | _ -> error "Wrong class type" )
         | _ -> error "Wrong type in equals-expression" )
     | Null -> return (TClass "null")
     | This -> (
-      match context.current_object with
-      | ObjectReference {class_key= key; _} -> return (TClass key)
+      match ctx.cur_object with
+      | ObjectReference {class_key= k; _} -> return (TClass k)
       | NullObjectReference -> error "Current object is null in context" )
     | Base -> (
-      match context.current_object with
-      | ObjectReference {class_key= key; _} ->
-          get_element class_table key
-          >>= fun class_t ->
-          ( match class_t.parent_key with
-          | Some key -> return key
+      match ctx.cur_object with
+      | ObjectReference {class_key= k; _} ->
+          get_elem_if_present_m class_table k
+          >>= fun k_clr ->
+          ( match k_clr.parent_key with
+          | Some k -> return k
           | None -> error "The current class has no parent" )
-          >>= fun parent_key -> return (TClass parent_key)
+          >>= fun par_k -> return (TClass par_k)
       | NullObjectReference -> error "Current object is null in context" )
     | CallMethod (Base, _) -> return TVoid
     | CallMethod (This, _) -> return TVoid
-    | CallMethod (Identifier method_name, arguments) ->
-        let current_object_key =
-          match context.current_object with
+    | CallMethod (Identifier m_ident, args) ->
+        let curr_obj_key =
+          match ctx.cur_object with
           | NullObjectReference -> "null"
           | ObjectReference {class_key= key; _} -> key in
-        get_element class_table current_object_key
-        >>= fun current_class ->
-        method_check current_class method_name arguments context class_table
-        >>= fun method_t -> return method_t.method_type
-    | AccessByPoint (object_expression, Identifier field_key) -> (
-        expressions_type_check object_expression context class_table
-        >>= fun object_type ->
-        match object_type with
+        get_elem_if_present_m class_table curr_obj_key
+        >>= fun curr_class ->
+        check_method curr_class m_ident args ctx class_table
+        >>= fun mr -> return mr.method_type
+    | AccessByPoint (obj_expr, Identifier f_key) -> (
+        expr_type_check obj_expr ctx class_table
+        >>= fun obj_c ->
+        match obj_c with
         | TClass "null" -> error "NullReferenceException"
-        | TClass class_key -> (
-            get_element class_table class_key
-            >>= fun class_t ->
-            let field_t = get_element_option class_t.fields_table field_key in
-            match field_t with
+        | TClass obj_key -> (
+            get_elem_if_present_m class_table obj_key
+            >>= fun obj_class ->
+            let var_field_o = get_element_option obj_class.fields_table f_key in
+            match var_field_o with
             | None -> error "No such field in class"
-            | Some field_t -> return field_t.field_type )
+            | Some var_field -> return var_field.field_type )
         | _ -> error "Wrong type: must be an object of some class" )
-    | AccessByPoint
-        (object_expression, CallMethod (Identifier method_name, arguments)) -> (
-        expressions_type_check object_expression context class_table
-        >>= fun object_type ->
-        match object_type with
+    | AccessByPoint (obj_expr, CallMethod (Identifier m_ident, args)) -> (
+        expr_type_check obj_expr ctx class_table
+        >>= fun obj_c ->
+        match obj_c with
         | TClass "null" -> error "NullReferenceException"
-        | TClass class_key ->
-            get_element class_table class_key
-            >>= fun class_t ->
-            method_check class_t method_name arguments context class_table
-            >>= fun method_t -> return method_t.method_type
+        | TClass obj_key ->
+            get_elem_if_present_m class_table obj_key
+            >>= fun obj_class ->
+            check_method obj_class m_ident args ctx class_table
+            >>= fun m_r -> return m_r.method_type
         | _ -> error "Wrong type: must be an object of some class" )
-    | ArrayAccess (array_expression, index_expression) -> (
-        expressions_type_check index_expression context class_table
-        >>= fun index_type ->
-        match index_type with
+    | ArrayAccess (arr_expr, index_expr) -> (
+        expr_type_check index_expr ctx class_table
+        >>= fun ind_t ->
+        match ind_t with
         | TInt -> (
-            expressions_type_check array_expression context class_table
-            >>= fun array_type ->
-            match array_type with
-            | TArray array_type -> return array_type
+            expr_type_check arr_expr ctx class_table
+            >>= fun arr_t ->
+            match arr_t with
+            | TArray t -> return t
             | _ -> error "Wrong type: must be <some_type[]>" )
         | _ -> error "Wrong type: index must be <int>" )
-    | ArrayCreationWithSize (array_type, size) -> (
-        expressions_type_check size context class_table
-        >>= fun size_type ->
-        match size_type with
+    | ArrayCreationWithSize (arr_type, size) -> (
+        expr_type_check size ctx class_table
+        >>= fun size_t ->
+        match size_t with
         | TInt -> (
-          match array_type with
+          match arr_type with
           | TVoid -> error "Wrong type: arrays cannot be <void[]>"
           | TArray _ ->
               error "Wrong type: multidimensional arrays are not supported"
-          | _ -> return (TArray array_type) )
+          | _ -> return (TArray arr_type) )
         | _ -> error "Wrong type: size must be <int>" )
-    | ArrayCreationWithElements (array_type, elements) ->
-        let rec elements_check = function
-          | [] -> return (TArray array_type)
-          | element :: tail -> (
-              expressions_type_check element context class_table
-              >>= fun element_type ->
-              match array_type with
-              | TClass array_class_name -> (
-                match element_type with
-                | TClass "null" -> elements_check tail
-                | TClass element_class_name ->
-                    class_assign_check array_class_name element_class_name
-                      class_table
-                    >> elements_check tail
+    | ArrayCreationWithElements (arr_type, elems) ->
+        let rec process_list_el = function
+          | [] -> return (TArray arr_type)
+          | el :: els -> (
+              expr_type_check el ctx class_table
+              >>= fun el_type ->
+              match arr_type with
+              | TClass cleft -> (
+                match el_type with
+                | TClass "null" -> process_list_el els
+                | TClass cright ->
+                    check_classname_assign cleft cright class_table
+                    >> process_list_el els
                 | _ ->
                     error
                       "Wrong type: an element in an array must be the type of \
                        this array" )
               | _ ->
-                  if array_type = element_type then elements_check tail
+                  if arr_type = el_type then process_list_el els
                   else
                     error
                       "Wrong type: an element in an array must be the type of \
                        this array" ) in
-        elements_check elements
-    | ClassCreation (Name class_name, arguments) -> (
-        let class_t = get_element_option class_table class_name in
-        match class_t with
-        | None -> error ("No such class implemented: " ^ class_name ^ "\n")
-        | Some class_t -> (
-          match arguments with
-          | [] -> return (TClass class_name)
-          | _ ->
-              constructor_check class_t arguments context class_table
-              >> return (TClass class_name) ) )
+        process_list_el elems
+    | ClassCreation (Name class_name, args) -> (
+      match get_element_option class_table class_name with
+      | None -> error ("No such class implemented: " ^ class_name ^ "\n")
+      | Some cl_elem -> (
+        match args with
+        | [] -> return (TClass class_name)
+        | _ ->
+            check_constructor cl_elem args ctx class_table
+            >> return (TClass class_name) ) )
     | Identifier key -> (
-        let variable = get_element_option context.variables_table key in
-        match variable with
+        let var_o = get_element_option ctx.var_table key in
+        match var_o with
         | None -> (
-          match context.current_object with
-          | ObjectReference {field_references_table= field_table; _} -> (
-              let field_t = get_element_option field_table key in
-              match field_t with
-              | None -> error "No such variable or field"
-              | Some field_t -> return field_t.field_type )
-          | NullObjectReference -> error "NullReferenceException" )
-        | Some variable -> return variable.variable_type )
+          match ctx.cur_object with
+          | ObjectReference {field_references_table= ft; _} -> (
+            match get_element_option ft key with
+            | None -> error ("No such variable or field with this name : " ^ key)
+            | Some fr -> return fr.field_type )
+          | _ -> error "NullReferenceException" )
+        | Some v -> return v.v_type )
     | Value value -> (
       match value with
       | VBool _ -> return TBool
       | VInt _ -> return TInt
       | VString _ -> return TString
       | VObjectReference NullObjectReference -> return (TClass "null")
-      | VObjectReference (ObjectReference {class_key= key; _}) ->
-          return (TClass key)
+      | VObjectReference (ObjectReference {class_key= ck; _}) ->
+          return (TClass ck)
       | VArray NullArrayReference -> return (TArray TVoid)
-      | VArray (ArrayReference {array_type= arr_type; _}) ->
-          return (TArray arr_type)
+      | VArray (ArrayReference {array_type= t; _}) -> return (TArray t)
       | _ -> error "Wrong constant value" )
     | Assign (left, right) -> (
-        expressions_type_check left context class_table
-        >>= fun left_type ->
-        match left_type with
+        expr_type_check left ctx class_table
+        >>= fun lt ->
+        match lt with
         | TVoid -> error "Can't assign anything to <void>"
-        | TClass left_class_key -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
-            | TClass "null" -> return (TClass left_class_key)
-            | TClass right_class_key ->
-                class_assign_check left_class_key right_class_key class_table
+        | TClass cleft_key -> (
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
+            | TClass "null" -> return (TClass cleft_key)
+            | TClass cright_key ->
+                check_classname_assign cleft_key cright_key class_table
             | _ -> error "Wrong assign types" )
-        | TArray (TClass left_class_key) -> (
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            match right_type with
-            | TArray (TClass right_class_key) ->
-                class_assign_check left_class_key right_class_key class_table
+        | TArray (TClass cleft_key) -> (
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            match rt with
+            | TArray (TClass cright_key) ->
+                check_classname_assign cleft_key cright_key class_table
             | _ -> error "Wrong assign types" )
         | _ ->
-            expressions_type_check right context class_table
-            >>= fun right_type ->
-            if left_type = right_type then return right_type
-            else error "Wrong assign types" )
+            expr_type_check right ctx class_table
+            >>= fun rt ->
+            if lt = rt then return rt else error "Wrong assign types" )
     | _ -> error "Wrong expression"
 
-  and class_type_polymorphism_check left_class_name right_class_name class_table
-      =
-    let rec check_parents class_key =
-      match get_element_option class_table class_key with
+  and check_classname_assign cleft_key cright_key class_table =
+    let rec check_parent_tree key =
+      get_elem_if_present_m class_table key
+      >>= fun clr_by_key ->
+      if clr_by_key.this_key = cleft_key then return (TClass cright_key)
+      else
+        match clr_by_key.parent_key with
+        | None ->
+            error "Cannot assign the most general type to the least general"
+        | Some par_k -> check_parent_tree par_k in
+    check_parent_tree cright_key
+
+  and check_classname_bool cleft_key cright_key class_table =
+    let rec check_parent_tree key =
+      match get_element_option class_table key with
       | None -> false
-      | Some class_t -> (
-          if class_t.this_key = left_class_name then true
+      | Some clr_by_key -> (
+          if clr_by_key.this_key = cleft_key then true
           else
-            match class_t.parent_key with
+            match clr_by_key.parent_key with
             | None -> false
-            | Some parent_key -> check_parents parent_key ) in
-    check_parents right_class_name
+            | Some par_k -> check_parent_tree par_k ) in
+    check_parent_tree cright_key
 
-  and class_assign_check left_class_key right_class_key class_table =
-    match
-      class_type_polymorphism_check left_class_key right_class_key class_table
-    with
-    | false -> error "Cannot assign the most general type to the least general"
-    | true -> return (TClass right_class_key)
-
-  and constructor_check class_t arguments context class_table =
-    let type_check : int -> types -> key_t -> constructor_t -> bool =
-     fun position argument_type _ constructor_t ->
-      match List.nth_opt constructor_t.arguments position with
+  and check_method cl_r m_name expr_list check_ctx class_table =
+    let check_type_m : int -> types -> key_t -> method_t -> bool =
+     fun pos curr_type _ value ->
+      match List.nth_opt value.arguments pos with
       | None -> false
       | Some (found_type, _) -> (
-        match argument_type with
+        match curr_type with
         | TClass "null" -> (
           match found_type with TClass _ -> true | _ -> false )
-        | TClass class_key -> (
+        | TClass curr_key -> (
           match found_type with
-          | TClass found_class_key ->
-              class_type_polymorphism_check found_class_key class_key
-                class_table
+          | TClass found_key ->
+              check_classname_bool found_key curr_key class_table
           | _ -> false )
-        | _ -> found_type = argument_type ) in
-    let rec helper ht position arguments context =
-      match Hashtbl.length ht with
-      | 0 -> error "No such constructor implemented"
-      | other -> (
-        match arguments with
-        | [] -> (
-          match other with
-          | 1 -> return (seq_hd (convert_table_to_seq ht))
-          | _ -> error "Cannot resolve constructor" )
-        | argument :: tail ->
-            expressions_type_check argument context class_table
-            >>= fun argument_type ->
-            helper
-              (Hashtbl_impr.filter ht (type_check position argument_type))
-              (position + 1) tail context ) in
-    helper
-      (Hashtbl_impr.filter class_t.constructors_table (fun _ constructor_t ->
-           List.length constructor_t.arguments = List.length arguments))
-      0 arguments context
-
-  and method_check class_t method_name arguments context class_table =
-    let type_check : int -> types -> key_t -> method_t -> bool =
-     fun position argument_type _ method_t ->
-      match List.nth_opt method_t.arguments position with
-      | None -> false
-      | Some (found_type, _) -> (
-        match argument_type with
-        | TClass "null" -> (
-          match found_type with TClass _ -> true | _ -> false )
-        | TClass class_key -> (
-          match found_type with
-          | TClass found_class_key ->
-              class_type_polymorphism_check found_class_key class_key
-                class_table
-          | _ -> false )
-        | _ -> found_type = argument_type ) in
-    let rec helper ht_filtred_by_argument position arguments context =
-      match Hashtbl.length ht_filtred_by_argument with
+        | _ -> found_type = curr_type ) in
+    let rec helper_checker curr_ht pos e_list ctx =
+      match Hashtbl.length curr_ht with
       | 0 -> error "No such method implemented"
       | other -> (
-        match arguments with
+        match e_list with
         | [] -> (
           match other with
-          | 1 -> return (seq_hd (convert_table_to_seq ht_filtred_by_argument))
+          | 1 -> return (seq_hd (convert_table_to_seq curr_ht))
           | _ -> error "Cannot resolve method" )
-        | argument :: tail ->
-            expressions_type_check argument context class_table
-            >>= fun argument_type ->
-            helper
-              (Hashtbl_impr.filter ht_filtred_by_argument
-                 (type_check position argument_type))
-              (position + 1) tail context ) in
-    Hashtbl_impr.filter class_t.methods_table (fun _ method_t ->
-        starts_with method_t.key method_name)
-    |> fun methods_table_filtred_by_name ->
-    helper
-      (Hashtbl_impr.filter methods_table_filtred_by_name (fun _ method_t ->
-           List.length method_t.arguments = List.length arguments))
-      0 arguments context
+        | e :: es ->
+            expr_type_check e ctx class_table
+            >>= fun e_type ->
+            helper_checker
+              (Hashtbl_impr.filter curr_ht (check_type_m pos e_type))
+              (pos + 1) es ctx ) in
+    Hashtbl_impr.filter cl_r.methods_table (fun _ mr ->
+        startswith mr.key m_name)
+    |> fun filtered_by_name ->
+    helper_checker
+      (Hashtbl_impr.filter filtered_by_name (fun _ mr ->
+           List.length mr.arguments = List.length expr_list))
+      0 expr_list check_ctx
 
-  let expression_in_statements = function
+  and check_constructor cl_r expr_list check_ctx class_table =
+    let check_type_c : int -> types -> key_t -> constructor_t -> bool =
+     fun pos curr_type _ value ->
+      match List.nth_opt value.arguments pos with
+      | None -> false
+      | Some (found_type, _) -> (
+        match curr_type with
+        | TClass "null" -> (
+          match found_type with TClass _ -> true | _ -> false )
+        | TClass curr_key -> (
+          match found_type with
+          | TClass found_key ->
+              check_classname_bool found_key curr_key class_table
+          | _ -> false )
+        | _ -> found_type = curr_type ) in
+    let rec helper_checker_c curr_ht pos e_list ctx =
+      match Hashtbl.length curr_ht with
+      | 0 -> error "No such constructor implemented"
+      | other -> (
+        match e_list with
+        | [] -> (
+          match other with
+          | 1 -> return (seq_hd (convert_table_to_seq curr_ht))
+          | _ -> error "Cannot resolve constructor" )
+        | e :: es ->
+            expr_type_check e ctx class_table
+            >>= fun e_type ->
+            helper_checker_c
+              (Hashtbl_impr.filter curr_ht (check_type_c pos e_type))
+              (pos + 1) es ctx ) in
+    helper_checker_c
+      (Hashtbl_impr.filter cl_r.constructors_table (fun _ cr ->
+           List.length cr.arguments = List.length expr_list))
+      0 expr_list check_ctx
+
+  let get_obj_value = function
+    | VObjectReference o -> o
+    | _ -> NullObjectReference
+
+  let make_list_of_elem el size =
+    let rec helper acc curr =
+      match curr with 0 -> acc | x -> helper (el :: acc) (x - 1) in
+    helper [] size
+
+  let inc_scope_level ctx = {ctx with scope_level= ctx.scope_level + 1}
+  let dec_scope_level ctx = {ctx with scope_level= ctx.scope_level - 1}
+
+  let check_assign_cnt_f : field_references -> unit M.t =
+   fun fld ->
+    match fld.assignments_count with
+    | 0 -> return ()
+    | _ when not fld.is_const -> return ()
+    | _ -> error "Assignment to a constant field"
+
+  let check_assign_cnt_v var =
+    match var.assignment_count with
+    | 0 -> return ()
+    | _ when not var.is_const -> return ()
+    | _ -> error "Assignment to a constant variable"
+
+  let delete_scope_var : context -> context M.t =
+   fun ctx ->
+    let delete : key_t -> variable -> unit =
+     fun key el ->
+      if el.scope_level = ctx.scope_level then Hashtbl.remove ctx.var_table key
+    in
+    Hashtbl.iter delete ctx.var_table ;
+    return ctx
+
+  let is_good_for_stmt = function
     | PostDec _ | PostInc _ | PrefDec _ | PrefInc _
      |CallMethod (_, _)
      |AccessByPoint (_, CallMethod (_, _))
@@ -975,1062 +1001,1003 @@ module Interpretation (M : MONADERROR) = struct
         true
     | _ -> false
 
-  let field_check_assign_count : field_references -> unit t =
-   fun field ->
-    match field.assignments_count with
-    | 0 -> return ()
-    | _ when not field.is_const -> return ()
-    | _ -> error "Assignment to a constant field"
-
-  let variable_check_assign_count variable =
-    match variable.assignments_count with
-    | 0 -> return ()
-    | _ when not variable.is_const -> return ()
-    | _ -> error "Assignment to a constant variable"
-
-  let make_list_of_element element size =
-    let rec helper list size =
-      match size with 0 -> list | x -> helper (element :: list) (x - 1) in
-    helper [] size
-
-  let increment_scope_level context =
-    {context with scope_level= context.scope_level + 1}
-
-  let decrement_scope_level context =
-    {context with scope_level= context.scope_level - 1}
-
-  let delete_variable_from_scope : context -> context t =
-   fun ctx ->
-    let delete : key_t -> variable -> unit =
-     fun key variable ->
-      if variable.scope_level = ctx.scope_level then
-        Hashtbl.remove ctx.variables_table key in
-    Hashtbl.iter delete ctx.variables_table ;
-    return ctx
-
-  let rec interpret_statements statement context class_table =
-    match statement with
-    | StatementBlock statement_list ->
-        let rec helper : statements list -> context -> context t =
-         fun stat_list ctx ->
-          match stat_list with
-          | [] -> return ctx
-          | stat :: tail -> (
-            match stat with
-            | (Break | Continue | Return _) when tail <> [] ->
-                error "Statemets block contains unreachable code"
-            | _ when ctx.nested_loops_count >= 1 && ctx.runtime_flag = WasBreak
-              ->
-                return ctx
-            | _
-              when ctx.nested_loops_count >= 1 && ctx.runtime_flag = WasContinue
-              ->
-                return ctx
-            | _ when ctx.runtime_flag = WasReturn -> return ctx
-            | _ ->
-                interpret_statements stat ctx class_table
-                >>= fun new_ctx -> helper tail new_ctx ) in
-        helper statement_list context
-        >>= fun ctx ->
-        if ctx.is_main_scope then return ctx else delete_variable_from_scope ctx
-    | While (expr, stat) -> (
-        let was_main = context.is_main_scope in
-        let rec loop st ctx =
-          if ctx.runtime_flag = WasBreak then
+  let rec eval_stmt stmt sctx class_table =
+    match stmt with
+    | StatementBlock st_list ->
+        let rec helper_eval : statements list -> context -> context M.t =
+         fun stl hctx ->
+          match stl with
+          | [] -> return hctx
+          | st :: sts -> (
             match st with
+            | (Break | Continue | Return _) when sts <> [] ->
+                error "Statemets block contains unreachable code"
+            | _
+              when hctx.nested_loops_cnt >= 1 && hctx.runtime_signal = WasBreak
+              ->
+                return hctx
+            | _
+              when hctx.nested_loops_cnt >= 1
+                   && hctx.runtime_signal = WasContinue ->
+                return hctx
+            | _ when hctx.runtime_signal = WasReturn -> return hctx
+            | _ ->
+                eval_stmt st hctx class_table
+                >>= fun head_ctx -> helper_eval sts head_ctx ) in
+        helper_eval st_list sctx
+        >>= fun sbctx ->
+        if sbctx.is_main_scope then return sbctx else delete_scope_var sbctx
+    | While (bexpr, lstmt) -> (
+        let was_main = sctx.is_main_scope in
+        let rec loop s ctx =
+          if ctx.runtime_signal = WasBreak then
+            match s with
             | StatementBlock _ ->
                 return
-                  (decrement_scope_level
+                  (dec_scope_level
                      { ctx with
-                       runtime_flag= NoFlag
-                     ; nested_loops_count= ctx.nested_loops_count - 1 })
+                       runtime_signal= NoSignal
+                     ; nested_loops_cnt= ctx.nested_loops_cnt - 1 })
             | _ ->
                 return
                   { ctx with
-                    runtime_flag= NoFlag
-                  ; nested_loops_count= ctx.nested_loops_count - 1 }
+                    runtime_signal= NoSignal
+                  ; nested_loops_cnt= ctx.nested_loops_cnt - 1 }
           else
-            interpret_expressions expr ctx class_table
-            >>= fun new_ctx ->
-            match new_ctx.last_expression_result with
+            eval_expr bexpr ctx class_table
+            >>= fun bectx ->
+            match bectx.last_expr_result with
             | VBool false -> (
-              match st with
+              match s with
               | StatementBlock _ ->
                   return
-                    (decrement_scope_level
-                       { new_ctx with
-                         nested_loops_count= ctx.nested_loops_count - 1
+                    (dec_scope_level
+                       { bectx with
+                         nested_loops_cnt= ctx.nested_loops_cnt - 1
                        ; is_main_scope= was_main })
               | _ ->
-                  return
-                    {new_ctx with nested_loops_count= ctx.nested_loops_count - 1}
+                  return {bectx with nested_loops_cnt= ctx.nested_loops_cnt - 1}
               )
             | VBool true -> (
-                interpret_statements st new_ctx class_table
-                >>= fun new_new_ctx ->
-                match new_new_ctx.runtime_flag with
-                | WasReturn -> return new_new_ctx
-                | WasContinue -> loop st {new_new_ctx with runtime_flag= NoFlag}
-                | _ -> loop st new_new_ctx )
+                eval_stmt s bectx class_table
+                >>= fun lctx ->
+                match lctx.runtime_signal with
+                | WasReturn -> return lctx
+                | WasContinue -> loop s {lctx with runtime_signal= NoSignal}
+                | _ -> loop s lctx )
             | _ -> error "Wrong expression type for loop <while> condition"
         in
-        match stat with
+        match lstmt with
         | StatementBlock _ ->
-            loop stat
-              (increment_scope_level
-                 { context with
-                   nested_loops_count= context.nested_loops_count + 1
+            loop lstmt
+              (inc_scope_level
+                 { sctx with
+                   nested_loops_cnt= sctx.nested_loops_cnt + 1
                  ; is_main_scope= false })
-        | _ ->
-            loop stat
-              {context with nested_loops_count= context.nested_loops_count + 1}
+        | _ -> loop lstmt {sctx with nested_loops_cnt= sctx.nested_loops_cnt + 1}
         )
     | Break ->
-        if context.nested_loops_count <= 0 then error "No loop for <break>"
-        else return {context with runtime_flag= WasBreak}
+        if sctx.nested_loops_cnt <= 0 then error "No loop for <break>"
+        else return {sctx with runtime_signal= WasBreak}
     | Continue ->
-        if context.nested_loops_count <= 0 then error "No loop for <continue>"
-        else return {context with runtime_flag= WasContinue}
-    | If (expr, stat_body, stat_else) -> (
-        interpret_expressions expr context class_table
-        >>= fun new_ctx ->
-        let was_main = new_ctx.is_main_scope in
-        match new_ctx.last_expression_result with
+        if sctx.nested_loops_cnt <= 0 then error "No loop for <continue>"
+        else return {sctx with runtime_signal= WasContinue}
+    | If (bexpr, then_stmt, else_stmt_o) -> (
+        eval_expr bexpr sctx class_table
+        >>= fun bectx ->
+        let was_main = bectx.is_main_scope in
+        match bectx.last_expr_result with
         | VBool true -> (
-          match stat_body with
+          match then_stmt with
           | StatementBlock _ ->
-              interpret_statements stat_body
-                (increment_scope_level {new_ctx with is_main_scope= false})
+              eval_stmt then_stmt
+                (inc_scope_level {bectx with is_main_scope= false})
                 class_table
-              >>= fun new_new_ctx ->
-              return
-                (decrement_scope_level
-                   {new_new_ctx with is_main_scope= was_main})
-          | _ -> interpret_statements stat_body new_ctx class_table )
+              >>= fun tctx ->
+              return (dec_scope_level {tctx with is_main_scope= was_main})
+          | _ -> eval_stmt then_stmt bectx class_table )
         | VBool false -> (
-          match stat_else with
-          | Some (StatementBlock _ as st_else) ->
-              interpret_statements st_else
-                (increment_scope_level {new_ctx with is_main_scope= false})
+          match else_stmt_o with
+          | Some (StatementBlock _ as else_stmt) ->
+              eval_stmt else_stmt
+                (inc_scope_level {bectx with is_main_scope= false})
                 class_table
-              >>= fun new_new_ctx ->
-              return
-                (decrement_scope_level
-                   {new_new_ctx with is_main_scope= was_main})
-          | Some st_else -> interpret_statements st_else new_ctx class_table
-          | None -> return context )
+              >>= fun ectx ->
+              return (dec_scope_level {ectx with is_main_scope= was_main})
+          | Some else_stmt -> eval_stmt else_stmt bectx class_table
+          | None -> return sctx )
         | _ -> error "Wrong expression type in <if> condition" )
-    | For (decl_stat, cond_expr, after_expr, body_stat) ->
-        let was_main = context.is_main_scope in
-        ( match decl_stat with
-        | None ->
-            return (increment_scope_level {context with is_main_scope= false})
-        | Some decl_st ->
-            interpret_statements decl_st
-              (increment_scope_level {context with is_main_scope= false})
+    | For (dec_stmt_o, bexpr_o, after_expr_list, body_stmt) ->
+        let was_main = sctx.is_main_scope in
+        ( match dec_stmt_o with
+        | None -> return (inc_scope_level {sctx with is_main_scope= false})
+        | Some dec_stmt ->
+            eval_stmt dec_stmt
+              (inc_scope_level {sctx with is_main_scope= false})
               class_table )
-        >>= fun decl_ctx ->
-        let rec loop body_st after_ex ctx =
-          if ctx.runtime_flag = WasBreak then
-            delete_variable_from_scope
+        >>= fun dec_ctx ->
+        let rec loop bs afs ctx =
+          if ctx.runtime_signal = WasBreak then
+            delete_scope_var
               { ctx with
-                runtime_flag= NoFlag
-              ; nested_loops_count= ctx.nested_loops_count - 1
+                runtime_signal= NoSignal
+              ; nested_loops_cnt= ctx.nested_loops_cnt - 1
               ; scope_level= ctx.scope_level - 1
               ; is_main_scope= was_main }
           else
-            ( match cond_expr with
-            | None -> return {ctx with last_expression_result= VBool true}
-            | Some cond_ex -> interpret_expressions cond_ex ctx class_table )
-            >>= fun cond_ctx ->
-            match cond_ctx.last_expression_result with
+            ( match bexpr_o with
+            | None -> return {ctx with last_expr_result= VBool true}
+            | Some bexpr -> eval_expr bexpr ctx class_table )
+            >>= fun bectx ->
+            match bectx.last_expr_result with
             | VBool false ->
-                delete_variable_from_scope
-                  { cond_ctx with
-                    nested_loops_count= cond_ctx.nested_loops_count - 1
-                  ; scope_level= cond_ctx.scope_level - 1
+                delete_scope_var
+                  { bectx with
+                    nested_loops_cnt= bectx.nested_loops_cnt - 1
+                  ; scope_level= bectx.scope_level - 1
                   ; is_main_scope= was_main }
             | VBool true -> (
-                let rec interpret_after_ex expr_list cont =
-                  match expr_list with
-                  | [] -> return cont
-                  | expr :: tail ->
-                      if expression_in_statements expr then
-                        interpret_expressions expr cont class_table
-                        >>= fun new_ctx -> interpret_after_ex tail new_ctx
+                let rec eval_inc_expr_list e_list c =
+                  match e_list with
+                  | [] -> return c
+                  | e :: es ->
+                      if is_good_for_stmt e then
+                        eval_expr e c class_table
+                        >>= fun ehctx -> eval_inc_expr_list es ehctx
                       else error "Wrong expression in after body" in
-                interpret_statements body_st
-                  {cond_ctx with scope_level= decl_ctx.scope_level + 1}
+                eval_stmt bs
+                  {bectx with scope_level= dec_ctx.scope_level + 1}
                   class_table
-                >>= fun body_ctx ->
-                match body_ctx.runtime_flag with
-                | WasReturn -> return {body_ctx with is_main_scope= was_main}
+                >>= fun bdctx ->
+                match bdctx.runtime_signal with
+                | WasReturn -> return {bdctx with is_main_scope= was_main}
                 | WasContinue ->
-                    interpret_after_ex after_ex body_ctx
+                    eval_inc_expr_list afs bdctx
                     >>= fun after_ctx ->
-                    loop body_st after_ex {after_ctx with runtime_flag= NoFlag}
+                    loop bs afs {after_ctx with runtime_signal= NoSignal}
                 | _ ->
-                    interpret_after_ex after_ex body_ctx
-                    >>= fun after_ctx -> loop body_st after_ex after_ctx )
+                    eval_inc_expr_list afs bdctx
+                    >>= fun after_ctx -> loop bs afs after_ctx )
             | _ -> error "Wrong expression type in loop <for> condition" in
-        loop body_stat after_expr
-          {decl_ctx with nested_loops_count= context.nested_loops_count + 1}
-    | Return None when context.current_method_type = TVoid ->
-        return
-          {context with last_expression_result= VVoid; runtime_flag= WasReturn}
+        loop body_stmt after_expr_list
+          {dec_ctx with nested_loops_cnt= sctx.nested_loops_cnt + 1}
+    | Return None when sctx.curr_method_type = TVoid ->
+        return {sctx with last_expr_result= VVoid; runtime_signal= WasReturn}
     | Return None -> error "Return value type mismatch"
-    | Return (Some ex) ->
-        expressions_type_check ex context class_table
-        >>= fun ex_type ->
-        if ex_type <> context.current_method_type then
+    | Return (Some rexpr) ->
+        expr_type_check rexpr sctx class_table
+        >>= fun rexpr_type ->
+        if rexpr_type <> sctx.curr_method_type then
           error "Return value type mismatch"
         else
-          interpret_expressions ex context class_table
-          >>= fun new_ctx -> return {new_ctx with runtime_flag= WasReturn}
-    | Expression expr ->
-        if expression_in_statements expr then
-          interpret_expressions expr context class_table
-          >>= fun new_ctx -> return new_ctx
+          eval_expr rexpr sctx class_table
+          >>= fun rectx -> return {rectx with runtime_signal= WasReturn}
+    | Expression sexpr ->
+        if is_good_for_stmt sexpr then
+          eval_expr sexpr sctx class_table >>= fun ectx -> return ectx
         else error "Wrong expression in statement"
-    | VariableDecl (modifier, variables_type, variable_list) ->
-        let is_const = function Some Const -> true | _ -> false in
-        let rec helper var_list ctx =
-          match var_list with
-          | [] -> return ctx
-          | (Name var_name, var_expr) :: tail -> (
-            match ctx.current_object with
+    | VariableDecl (modifier, vars_type, var_list) ->
+        let is_const : modifiers option -> bool = function
+          | Some Const -> true
+          | _ -> false in
+        let rec helper_vardec v_list vctx =
+          match v_list with
+          | [] -> return vctx
+          | (Name name, var_expr_o) :: vs -> (
+            match vctx.cur_object with
             | NullObjectReference ->
                 error "Cannot assign value to variable of null-object"
-            | ObjectReference {field_references_table= field_ref_table; _} ->
-                ( if
-                  Hashtbl.mem ctx.variables_table var_name
-                  || Hashtbl.mem field_ref_table var_name
-                then error "Variable with this name is already defined"
+            | ObjectReference {field_references_table= frt; _} ->
+                ( if Hashtbl.mem vctx.var_table name || Hashtbl.mem frt name then
+                  error "Variable with this name is already defined"
                 else
-                  match var_expr with
+                  match var_expr_o with
                   | None ->
-                      Hashtbl.add ctx.variables_table var_name
-                        { variable_type= variables_type
-                        ; variable_key= var_name
+                      Hashtbl.add vctx.var_table name
+                        { v_type= vars_type
+                        ; v_key= name
                         ; is_const= is_const modifier
-                        ; assignments_count= 0
-                        ; variable_value= get_type_default_value variables_type
-                        ; scope_level= ctx.scope_level } ;
-                      return ctx
-                  | Some var_ex -> (
-                      expressions_type_check var_ex ctx class_table
-                      >>= fun var_ex_type ->
-                      let add_variable ve =
-                        interpret_expressions ve ctx class_table
-                        >>= fun ve_ctx ->
-                        Hashtbl.add ve_ctx.variables_table var_name
-                          { variable_type= var_ex_type
-                          ; variable_key= var_name
+                        ; assignment_count= 0
+                        ; v_value= get_type_default_value vars_type
+                        ; scope_level= vctx.scope_level } ;
+                      return vctx
+                  | Some var_expr -> (
+                      expr_type_check var_expr vctx class_table
+                      >>= fun var_expr_type ->
+                      let add_var ve =
+                        eval_expr ve vctx class_table
+                        >>= fun vare_ctx ->
+                        Hashtbl.add vare_ctx.var_table name
+                          { v_type= var_expr_type
+                          ; v_key= name
                           ; is_const= is_const modifier
-                          ; assignments_count= 1
-                          ; variable_value= ve_ctx.last_expression_result
-                          ; scope_level= ve_ctx.scope_level } ;
-                        return ve_ctx in
-                      match var_ex_type with
+                          ; assignment_count= 1
+                          ; v_value= vare_ctx.last_expr_result
+                          ; scope_level= vare_ctx.scope_level } ;
+                        return vare_ctx in
+                      match var_expr_type with
                       | TClass "null" -> (
-                        match variables_type with
-                        | TClass _ -> add_variable var_ex
+                        match vars_type with
+                        | TClass _ -> add_var var_expr
                         | _ -> error "Wrong assign type in declaration" )
-                      | TClass right_class_key -> (
-                        match variables_type with
-                        | TClass left_class_key ->
-                            class_assign_check left_class_key right_class_key
-                              class_table
-                            >>= fun _ -> add_variable var_ex
+                      | TClass cright -> (
+                        match vars_type with
+                        | TClass cleft ->
+                            check_classname_assign cleft cright class_table
+                            >>= fun _ -> add_var var_expr
                         | _ -> error "Wrong assign type in declaration" )
-                      | TArray (TClass right_class_key) -> (
-                        match variables_type with
-                        | TArray (TClass left_class_key) ->
-                            class_assign_check left_class_key right_class_key
-                              class_table
-                            >>= fun _ -> add_variable var_ex
+                      | TArray (TClass cright) -> (
+                        match vars_type with
+                        | TArray (TClass cleft) ->
+                            check_classname_assign cleft cright class_table
+                            >>= fun _ -> add_var var_expr
                         | _ -> error "Wrong assign type in declaration" )
-                      | _ when var_ex_type = variables_type ->
-                          add_variable var_ex
+                      | _ when var_expr_type = vars_type -> add_var var_expr
                       | _ ->
                           error
                             ( "Wrong value type for declared variable: "
-                            ^ show_types var_ex_type ) ) )
-                >>= fun new_ctx -> helper tail new_ctx ) in
-        helper variable_list context
+                            ^ show_types var_expr_type ) ) )
+                >>= fun head_ctx -> helper_vardec vs head_ctx ) in
+        helper_vardec var_list sctx
 
-  and interpret_expressions expression context class_table =
-    let evaluate_expression expr ctx =
-      let evaluate_binary_opeation left right operation =
-        interpret_expressions left ctx class_table
-        >>= fun left_ctx ->
-        interpret_expressions right left_ctx class_table
-        >>= fun right_ctx ->
-        let left_value = left_ctx.last_expression_result in
-        let right_value = right_ctx.last_expression_result in
-        let new_value = operation left_value right_value in
-        try return {right_ctx with last_expression_result= new_value} with
-        | Invalid_argument message -> error message
+  and eval_expr expr ectx class_table =
+    let eval_e e_expr ctx =
+      let eval_op left right op =
+        eval_expr left ctx class_table
+        >>= fun lctx ->
+        eval_expr right lctx class_table
+        >>= fun rctx ->
+        let l_value = lctx.last_expr_result in
+        let r_value = rctx.last_expr_result in
+        let new_value = op l_value r_value in
+        try return {rctx with last_expr_result= new_value} with
+        | Invalid_argument m -> error m
         | Division_by_zero -> error "Division by zero" in
-      let evaluate_unary_opeation operand operation =
-        interpret_expressions operand ctx class_table
-        >>= fun operand_ctx ->
-        let operand_value = operand_ctx.last_expression_result in
-        let new_value = operation operand_value in
-        try return {operand_ctx with last_expression_result= new_value}
-        with Invalid_argument message -> error message in
-      match expr with
-      | Add (left, right) -> evaluate_binary_opeation left right ( ++ )
-      | Sub (left, right) -> evaluate_binary_opeation left right ( -- )
-      | Mult (left, right) -> evaluate_binary_opeation left right ( ** )
-      | Div (left, right) -> evaluate_binary_opeation left right ( // )
-      | Mod (left, right) -> evaluate_binary_opeation left right ( %% )
-      | And (left, right) -> evaluate_binary_opeation left right ( &&& )
-      | Or (left, right) -> evaluate_binary_opeation left right ( ||| )
-      | Not operand -> evaluate_unary_opeation operand ( !!! )
-      | Less (left, right) -> evaluate_binary_opeation left right ( <<< )
-      | More (left, right) -> evaluate_binary_opeation left right ( >>> )
-      | LessOrEqual (left, right) ->
-          evaluate_binary_opeation left right ( <<== )
-      | MoreOrEqual (left, right) ->
-          evaluate_binary_opeation left right ( >>== )
+      let eval_un v_expr op =
+        eval_expr v_expr ctx class_table
+        >>= fun vctx ->
+        let v = vctx.last_expr_result in
+        let new_v = op v in
+        try return {vctx with last_expr_result= new_v}
+        with Invalid_argument m -> error m in
+      match e_expr with
+      | Add (left, right) -> eval_op left right ( ++ )
+      | Sub (left, right) -> eval_op left right ( -- )
+      | Mult (left, right) -> eval_op left right ( ** )
+      | Div (left, right) -> eval_op left right ( // )
+      | Mod (left, right) -> eval_op left right ( %% )
+      | And (left, right) -> eval_op left right ( &&& )
+      | Or (left, right) -> eval_op left right ( ||| )
+      | Not bexp -> eval_un bexp ( !!! )
+      | Less (left, right) -> eval_op left right ( <<< )
+      | More (left, right) -> eval_op left right ( >>> )
+      | LessOrEqual (left, right) -> eval_op left right ( <<== )
+      | MoreOrEqual (left, right) -> eval_op left right ( >>== )
       | Equal (left, right) -> (
-          expressions_type_check left ctx class_table
-          >>= fun left_type ->
-          match left_type with
-          | TClass left_key ->
-              get_element class_table left_key
-              >>= fun left_class ->
-              get_element left_class.methods_table equals_key
-              >>= fun left_equals ->
-              if left_equals.is_overriden then
-                interpret_expressions
+          expr_type_check left ctx class_table
+          >>= fun l_type ->
+          match l_type with
+          | TClass l_key ->
+              get_elem_if_present_m class_table l_key
+              >>= fun left_clr ->
+              get_elem_if_present_m left_clr.methods_table equals_key
+              >>= fun left_eqr ->
+              if left_eqr.is_overriden then
+                eval_expr
                   (AccessByPoint
                      (left, CallMethod (Identifier "Equals", [right])))
                   ctx class_table
-              else evaluate_binary_opeation left right ( === )
-          | _ -> evaluate_binary_opeation left right ( === ) )
-      | NotEqual (left, right) -> evaluate_binary_opeation left right ( !=! )
-      | Value value -> return {ctx with last_expression_result= value}
-      | Identifier identifier -> (
-        match get_element_option ctx.variables_table identifier with
-        | Some variable ->
-            return {ctx with last_expression_result= variable.variable_value}
+              else eval_op left right ( === )
+          | _ -> eval_op left right ( === ) )
+      | NotEqual (left, right) -> eval_op left right ( !=! )
+      | Value v -> return {ctx with last_expr_result= v}
+      | Identifier id -> (
+        match get_element_option ctx.var_table id with
+        | Some var_by_id -> return {ctx with last_expr_result= var_by_id.v_value}
         | None -> (
           try
-            get_object_info ctx.current_object
-            |> fun (_, field_references_table, _) ->
-            match get_element_option field_references_table identifier with
-            | Some field ->
-                return {ctx with last_expression_result= field.field_value}
+            get_object_info ctx.cur_object
+            |> fun (_, frt, _) ->
+            match get_element_option frt id with
+            | Some f -> return {ctx with last_expr_result= f.field_value}
             | None -> error "No such variable or field"
-          with Invalid_argument message | Failure message -> error message ) )
+          with Invalid_argument m | Failure m -> error m ) )
       | Null ->
           return
-            { ctx with
-              last_expression_result= VObjectReference NullObjectReference }
-      | CallMethod (This, arguments) ->
-          ( match ctx.current_constructor_key with
+            {ctx with last_expr_result= VObjectReference NullObjectReference}
+      | CallMethod (This, args) ->
+          ( match ctx.cur_constr_key with
           | None ->
               error "this(...) call must be in Constructor(...) : this(...)"
-          | Some constructor_key -> return constructor_key )
-          >>= fun external_constructor_key ->
-          let get_current_class_key =
-            match ctx.current_object with
+          | Some k -> return k )
+          >>= fun external_constr_key ->
+          let get_cur_class_key =
+            match ctx.cur_object with
             | NullObjectReference -> error "NullReferenceException"
             | ObjectReference {class_key= key; _} -> return key in
-          get_current_class_key
-          >>= fun current_class_key ->
-          get_element class_table current_class_key
-          >>= fun current_class ->
-          constructor_check current_class arguments ctx class_table
-          >>= fun constructor ->
-          if constructor.key = external_constructor_key then
+          get_cur_class_key
+          >>= fun curr_class_key ->
+          get_elem_if_present_m class_table curr_class_key
+          >>= fun cur_class_r ->
+          check_constructor cur_class_r args ctx class_table
+          >>= fun constr_r ->
+          if constr_r.key = external_constr_key then
             error "Constructor recursion"
           else
-            check_call_constructor constructor.body current_class
-              constructor.call_constructor
-            >>= fun constructor_body ->
+            prepare_constructor_block constr_r.body cur_class_r
+              constr_r.call_constructor
+            >>= fun c_body ->
             ( try
-                initialize_table_with_arguments (Hashtbl.create 128) arguments
-                  constructor.arguments ctx class_table
-              with Invalid_argument message -> error message )
-            >>= fun (var_table, new_ctx) ->
-            interpret_statements constructor_body
-              {new_ctx with variables_table= var_table; is_creation= true}
+                prepare_table_with_args_exn (Hashtbl.create 100) args
+                  constr_r.arguments ctx class_table
+              with Invalid_argument m -> error m )
+            >>= fun (vt, vctx) ->
+            eval_stmt c_body
+              {vctx with var_table= vt; is_creation= true}
               class_table
-            >>= fun new_new_ctx ->
+            >>= fun res_ctx ->
             return
-              { new_new_ctx with
-                last_expression_result= VVoid
-              ; variables_table= ctx.variables_table
-              ; constructor_affilation= ctx.constructor_affilation
+              { res_ctx with
+                last_expr_result= VVoid
+              ; var_table= ctx.var_table
+              ; constr_affilation= ctx.constr_affilation
               ; is_creation= true }
-      | CallMethod (Base, arguments) -> (
-          ( match ctx.current_constructor_key with
+      | CallMethod (Base, args) -> (
+          ( match ctx.cur_constr_key with
           | None ->
               error "base(...) call must be in Constructor(...) : base(...)"
-          | Some constructor_key -> return constructor_key )
+          | Some k -> return k )
           >>= fun _ ->
-          ( match ctx.constructor_affilation with
+          ( match ctx.constr_affilation with
           | None ->
               error "base(...) call must be in Constructor(...) : base(...)"
-          | Some constructor_affilation -> return constructor_affilation )
-          >>= fun current_class_key ->
-          get_element class_table current_class_key
-          >>= fun current_class ->
-          match current_class.parent_key with
+          | Some c_aff -> return c_aff )
+          >>= fun curr_class_key ->
+          get_elem_if_present_m class_table curr_class_key
+          >>= fun cur_class_r ->
+          match cur_class_r.parent_key with
           | None -> error "Bad base(...) call usage: this class has no parent"
-          | Some parent_key ->
-              get_element class_table parent_key
-              >>= fun parent_class ->
-              constructor_check parent_class arguments ctx class_table
-              >>= fun parent_constructor ->
-              check_call_constructor parent_constructor.body parent_class
-                parent_constructor.call_constructor
-              >>= fun parent_constructor_body ->
+          | Some par_key ->
+              get_elem_if_present_m class_table par_key
+              >>= fun par_r ->
+              check_constructor par_r args ctx class_table
+              >>= fun constr_r ->
+              prepare_constructor_block constr_r.body par_r
+                constr_r.call_constructor
+              >>= fun par_constr_body ->
               ( try
-                  initialize_table_with_arguments (Hashtbl.create 128) arguments
-                    parent_constructor.arguments ctx class_table
-                with Invalid_argument message -> error message )
-              >>= fun (var_table, new_ctx) ->
-              interpret_statements parent_constructor_body
-                { new_ctx with
-                  variables_table= var_table
+                  prepare_table_with_args_exn (Hashtbl.create 100) args
+                    constr_r.arguments ctx class_table
+                with Invalid_argument m -> error m )
+              >>= fun (vt, vctx) ->
+              eval_stmt par_constr_body
+                { vctx with
+                  var_table= vt
                 ; is_creation= true
-                ; constructor_affilation= Some parent_key
-                ; current_constructor_key= Some parent_constructor.key }
+                ; constr_affilation= Some par_key
+                ; cur_constr_key= Some constr_r.key }
                 class_table
-              >>= fun new_new_ctx ->
+              >>= fun res_ctx ->
               return
-                { new_new_ctx with
-                  last_expression_result= VVoid
-                ; variables_table= ctx.variables_table
-                ; is_creation= true
-                ; constructor_affilation= ctx.constructor_affilation } )
+                { res_ctx with
+                  last_expr_result= VVoid
+                ; var_table= ctx.var_table
+                ; constr_affilation= ctx.constr_affilation
+                ; is_creation= true } )
       | This ->
-          return
-            { ctx with
-              last_expression_result= VObjectReference ctx.current_object }
-      | AccessByPoint (expr, Identifier field_key) -> (
-          interpret_expressions expr ctx class_table
-          >>= fun expr_ctx ->
-          let obj = expr_ctx.last_expression_result in
+          return {ctx with last_expr_result= VObjectReference ctx.cur_object}
+      | AccessByPoint (obj_expr, Identifier f_key) -> (
+          eval_expr obj_expr ctx class_table
+          >>= fun octx ->
+          let obj = octx.last_expr_result in
           match obj with
-          | VObjectReference
-              (ObjectReference {field_references_table= field_ref_table; _}) ->
-              get_element field_ref_table field_key
-              >>= fun field ->
-              return {expr_ctx with last_expression_result= field.field_value}
+          | VObjectReference (ObjectReference {field_references_table= frt; _})
+            ->
+              get_elem_if_present_m frt f_key
+              >>= fun fld -> return {octx with last_expr_result= fld.field_value}
           | _ -> error "Cannot access field of non-object" )
-      | AccessByPoint (expr, CallMethod (Identifier method_name, arguments))
-        -> (
-          interpret_expressions expr ctx class_table
-          >>= fun expr_ctx ->
-          let obj = expr_ctx.last_expression_result in
+      | AccessByPoint (obj_expr, CallMethod (Identifier m_name, args)) -> (
+          eval_expr obj_expr ctx class_table
+          >>= fun octx ->
+          let obj = octx.last_expr_result in
           match obj with
           | VObjectReference NullObjectReference ->
               error "NullReferenceException"
           | VObjectReference
               (ObjectReference
-                {class_key= key; field_references_table= frt; number= num}) -> (
-            match get_element_option class_table key with
+                {class_key= cl_k; field_references_table= c_frt; number= c_n})
+            -> (
+            match get_element_option class_table cl_k with
             | None -> error "No such class to call method"
-            | Some class_t ->
-                method_check class_t method_name arguments expr_ctx class_table
-                >>= fun method_t ->
-                ( match method_t.body with
+            | Some obj_class ->
+                check_method obj_class m_name args octx class_table
+                >>= fun mr ->
+                ( match mr.body with
                 | None -> error "Error: abstract class creation"
-                | Some body -> return body )
-                >>= fun method_body ->
-                let new_variables_table : (key_t, variable) Hashtbl_impr.t =
-                  Hashtbl.create 128 in
+                | Some b -> return b )
+                >>= fun m_body ->
+                let new_var_table : (key_t, variable) Hashtbl_impr.t =
+                  Hashtbl.create 100 in
                 ( try
-                    initialize_table_with_arguments new_variables_table
-                      arguments method_t.arguments expr_ctx class_table
-                  with Invalid_argument message -> error message )
-                >>= fun (new_var_table, new_ctx) ->
-                interpret_statements method_body
-                  { current_object=
+                    prepare_table_with_args_exn new_var_table args mr.arguments
+                      octx class_table
+                  with Invalid_argument m -> error m )
+                >>= fun (new_vt, new_ctx) ->
+                eval_stmt m_body
+                  { cur_object=
                       ObjectReference
-                        { class_key= key
-                        ; field_references_table= frt
-                        ; number= num }
-                  ; variables_table= new_var_table
-                  ; last_expression_result= VVoid
-                  ; runtime_flag= NoFlag
-                  ; current_method_type= method_t.method_type
+                        { class_key= cl_k
+                        ; field_references_table= c_frt
+                        ; number= c_n }
+                  ; var_table= new_vt
+                  ; last_expr_result= VVoid
+                  ; runtime_signal= NoSignal
+                  ; curr_method_type= mr.method_type
                   ; is_main_scope= false
-                  ; nested_loops_count= 0
+                  ; nested_loops_cnt= 0
                   ; scope_level= 0
-                  ; current_constructor_key= None
-                  ; previous_context= Some ctx
-                  ; objects_created_count= ctx.objects_created_count
+                  ; cur_constr_key= None
+                  ; prev_context= Some ctx
+                  ; obj_created_cnt= ctx.obj_created_cnt
                   ; is_creation= false
-                  ; constructor_affilation= None }
+                  ; constr_affilation= None }
                   class_table
-                >>= fun result_ctx ->
+                >>= fun m_res_ctx ->
                 return
                   { new_ctx with
-                    last_expression_result=
-                      ( if method_t.method_type = TVoid then VVoid
-                      else result_ctx.last_expression_result )
-                  ; objects_created_count= result_ctx.objects_created_count
+                    last_expr_result= m_res_ctx.last_expr_result
+                  ; obj_created_cnt= m_res_ctx.obj_created_cnt
                   ; is_creation= false } )
           | _ -> error "Cannot access field of non-object" )
-      | CallMethod (Identifier method_name, arguments) ->
-          interpret_expressions
-            (AccessByPoint (This, CallMethod (Identifier method_name, arguments)))
+      | CallMethod (Identifier m, args) ->
+          eval_expr
+            (AccessByPoint (This, CallMethod (Identifier m, args)))
             ctx class_table
       | ArrayAccess (arr_expr, index_expr) -> (
-          interpret_expressions arr_expr ctx class_table
-          >>= fun arr_ctx ->
-          interpret_expressions index_expr ctx class_table
-          >>= fun ind_ctx ->
-          let arr_value = arr_ctx.last_expression_result in
-          let ind_value = ind_ctx.last_expression_result in
-          match arr_value with
-          | VArray (ArrayReference {array_values= array_value_list; _}) -> (
-            match ind_value with
-            | VInt i when i < 0 || i >= List.length array_value_list ->
+          eval_expr arr_expr ctx class_table
+          >>= fun arrctx ->
+          eval_expr index_expr ctx class_table
+          >>= fun indctx ->
+          let arr_v = arrctx.last_expr_result in
+          let ind_v = indctx.last_expr_result in
+          match arr_v with
+          | VArray (ArrayReference {array_values= a_values; _}) -> (
+            match ind_v with
+            | VInt i when i < 0 || i >= List.length a_values ->
                 error "IndexOutOfRangeException"
             | VInt i ->
-                return
-                  { ind_ctx with
-                    last_expression_result= List.nth array_value_list i }
+                return {indctx with last_expr_result= List.nth a_values i}
             | _ -> error "Index must be int" )
           | VArray NullArrayReference -> error "NullReferenceException"
           | _ -> error "Cannot access a non-array" )
       | ArrayCreationWithSize (arr_type, size_expr) -> (
-          interpret_expressions size_expr ctx class_table
-          >>= fun size_ctx ->
-          let size_value = size_ctx.last_expression_result in
-          let def_value = get_type_default_value arr_type in
-          match size_value with
+          eval_expr size_expr ctx class_table
+          >>= fun szctx ->
+          let size_v = szctx.last_expr_result in
+          let init_v = get_type_default_value arr_type in
+          match size_v with
           | VInt size ->
               return
-                { size_ctx with
-                  last_expression_result=
+                { szctx with
+                  last_expr_result=
                     VArray
                       (ArrayReference
                          { array_type= arr_type
-                         ; array_values= make_list_of_element def_value size
-                         ; number= size_ctx.objects_created_count + 1 })
-                ; objects_created_count= size_ctx.objects_created_count + 1 }
+                         ; array_values= make_list_of_elem init_v size
+                         ; number= szctx.obj_created_cnt + 1 })
+                ; obj_created_cnt= szctx.obj_created_cnt + 1 }
           | _ -> error "Size must be int" )
-      | ArrayCreationWithElements (arr_type, expr_list) ->
-          let make_value_list ex_list ex_ctx =
-            fold_left
-              (fun (arr_list, arr_ctx) ex ->
-                interpret_expressions ex arr_ctx class_table
-                >>= fun new_ex_ctx ->
-                let new_value = new_ex_ctx.last_expression_result in
-                return (arr_list @ [new_value], new_ex_ctx))
-              ([], ex_ctx) ex_list in
-          make_value_list expr_list ctx
-          >>= fun (value_list, new_ctx) ->
+      | ArrayCreationWithElements (a_type, expr_list) ->
+          let make_val_list ex_list fctx =
+            mfold_left
+              (fun (a_lst, hctx) e ->
+                eval_expr e hctx class_table
+                >>= fun ectx ->
+                let head_val = ectx.last_expr_result in
+                return (a_lst @ [head_val], ectx))
+              ([], fctx) ex_list in
+          make_val_list expr_list ctx
+          >>= fun (values, r_ctx) ->
           return
             { ctx with
-              last_expression_result=
+              last_expr_result=
                 VArray
                   (ArrayReference
-                     { array_type= arr_type
-                     ; array_values= value_list
-                     ; number= new_ctx.objects_created_count + 1 })
-            ; objects_created_count= new_ctx.objects_created_count + 1 }
-      | ClassCreation (Name class_name, class_arguments) ->
-          get_element class_table class_name
-          >>= fun object_class ->
-          if object_class.is_abstract then
-            error "This class is abstract! No object creation allowed"
+                     { array_type= a_type
+                     ; array_values= values
+                     ; number= r_ctx.obj_created_cnt + 1 })
+            ; obj_created_cnt= r_ctx.obj_created_cnt + 1 }
+      | ClassCreation (Name class_name, c_args) ->
+          get_elem_if_present_m class_table class_name
+          >>= fun obj_class ->
+          if obj_class.is_abstract then
+            error "This class is abstract: no object creation allowed"
           else
-            constructor_check object_class class_arguments ctx class_table
-            >>= fun constructor ->
-            let rec initialize_object class_t init_ctx =
+            check_constructor obj_class c_args ctx class_table
+            >>= fun constr_r ->
+            let rec init_object cl_r init_ctx =
               let field_tuples =
-                get_variable_field_pairs_list_typed class_t.decl_tree in
+                get_variable_field_pairs_list_typed cl_r.decl_tree in
               let rec helper_init acc_ht help_ctx = function
                 | [] -> return help_ctx
-                | (current_field_type, Name current_field_name, field_expression)
-                  :: tail ->
-                    let is_const_field field_key =
-                      get_element object_class.fields_table field_key
+                | (curr_f_type, Name f_name, f_expr_o) :: tps ->
+                    let is_const_field f_key =
+                      get_elem_if_present_m obj_class.fields_table f_key
                       >>= fun test_field -> return test_field.is_const in
-                    ( match field_expression with
-                    | Some field_expr -> (
-                        expressions_type_check field_expr help_ctx class_table
+                    ( match f_expr_o with
+                    | Some f_expr -> (
+                        expr_type_check f_expr help_ctx class_table
                         >>= fun expr_type ->
-                        is_const_field current_field_name
-                        >>= fun const ->
-                        let add_field field_ex =
-                          interpret_expressions field_ex help_ctx class_table
-                          >>= fun field_ex_ctx ->
-                          Hashtbl.add acc_ht current_field_name
-                            { key= current_field_name
-                            ; field_type= current_field_type
-                            ; field_value= field_ex_ctx.last_expression_result
-                            ; is_const= const
+                        is_const_field f_name
+                        >>= fun is_const_f ->
+                        let add_field fe =
+                          eval_expr fe help_ctx class_table
+                          >>= fun fe_ctx ->
+                          Hashtbl.add acc_ht f_name
+                            { key= f_name
+                            ; field_type= curr_f_type
+                            ; field_value= fe_ctx.last_expr_result
+                            ; is_const= is_const_f
                             ; assignments_count= 1 } ;
-                          return (field_ex_ctx, acc_ht) in
+                          return (fe_ctx, acc_ht) in
                         match expr_type with
                         | TClass "null" -> (
-                          match current_field_type with
-                          | TClass _ -> add_field field_expr
+                          match curr_f_type with
+                          | TClass _ -> add_field f_expr
                           | _ -> error "Wrong assign type in field declaration"
                           )
-                        | TClass class_right -> (
-                          match current_field_type with
-                          | TClass class_left ->
-                              class_assign_check class_left class_right
-                                class_table
-                              >>= fun _ -> add_field field_expr
+                        | TClass cright -> (
+                          match curr_f_type with
+                          | TClass cleft ->
+                              check_classname_assign cleft cright class_table
+                              >>= fun _ -> add_field f_expr
                           | _ -> error "Wrong assign type in field declaration"
                           )
-                        | TArray (TClass class_right) -> (
-                          match current_field_type with
-                          | TArray (TClass class_left) ->
-                              class_assign_check class_left class_right
-                                class_table
-                              >>= fun _ -> add_field field_expr
+                        | TArray (TClass cright) -> (
+                          match curr_f_type with
+                          | TArray (TClass cleft) ->
+                              check_classname_assign cleft cright class_table
+                              >>= fun _ -> add_field f_expr
                           | _ -> error "Wrong assign type in declaration" )
-                        | _ when expr_type = current_field_type ->
-                            add_field field_expr
+                        | _ when expr_type = curr_f_type -> add_field f_expr
                         | _ -> error "Wrong assign type in declaration" )
                     | None ->
-                        is_const_field current_field_name
-                        >>= fun const ->
-                        Hashtbl.add acc_ht current_field_name
-                          { key= current_field_name
-                          ; field_type= current_field_type
-                          ; field_value=
-                              get_type_default_value current_field_type
-                          ; is_const= const
+                        is_const_field f_name
+                        >>= fun is_const_f ->
+                        Hashtbl.add acc_ht f_name
+                          { key= f_name
+                          ; field_type= curr_f_type
+                          ; field_value= get_type_default_value curr_f_type
+                          ; is_const= is_const_f
                           ; assignments_count= 0 } ;
                         return (help_ctx, acc_ht) )
                     >>= fun (head_ctx, head_ht) ->
-                    object_number head_ctx.current_object
+                    obj_num head_ctx.cur_object
                     >>= fun num ->
                     helper_init head_ht
                       { head_ctx with
-                        current_object=
+                        cur_object=
                           ObjectReference
                             { class_key= class_name
                             ; field_references_table= head_ht
                             ; number= num } }
-                      tail in
-              match class_t.parent_key with
-              | None -> helper_init (Hashtbl.create 128) init_ctx field_tuples
-              | Some parent_key ->
-                  get_element class_table parent_key
-                  >>= fun parent_class ->
-                  initialize_object parent_class init_ctx
-                  >>= fun parent_ctx ->
+                      tps in
+              match cl_r.parent_key with
+              | None -> helper_init (Hashtbl.create 100) init_ctx field_tuples
+              | Some par_key ->
+                  get_elem_if_present_m class_table par_key
+                  >>= fun parent_r ->
+                  init_object parent_r init_ctx
+                  >>= fun par_ctx ->
                   helper_init
-                    (get_object_fields parent_ctx.current_object)
-                    parent_ctx field_tuples in
+                    (get_object_fields par_ctx.cur_object)
+                    par_ctx field_tuples in
             let new_object =
               ObjectReference
                 { class_key= class_name
-                ; field_references_table= Hashtbl.create 128
-                ; number= ctx.objects_created_count + 1 } in
-            initialize_object object_class
-              { current_object= new_object
-              ; variables_table= Hashtbl.create 128
-              ; last_expression_result= VVoid
-              ; runtime_flag= NoFlag
-              ; current_method_type= TVoid
+                ; field_references_table= Hashtbl.create 100
+                ; number= ctx.obj_created_cnt + 1 } in
+            init_object obj_class
+              { cur_object= new_object
+              ; var_table= Hashtbl.create 100
+              ; last_expr_result= VVoid
+              ; runtime_signal= NoSignal
+              ; curr_method_type= TVoid
               ; is_main_scope= false
-              ; nested_loops_count= 0
+              ; nested_loops_cnt= 0
               ; scope_level= 0
-              ; previous_context= Some ctx
-              ; objects_created_count= ctx.objects_created_count + 1
-              ; current_constructor_key= None
+              ; prev_context= Some ctx
+              ; obj_created_cnt= ctx.obj_created_cnt + 1
+              ; cur_constr_key= None
               ; is_creation= false
-              ; constructor_affilation= None }
-            >>= fun new_ctx ->
-            let new_variable_table =
+              ; constr_affilation= None }
+            >>= fun initres_ctx ->
+            let get_new_var_table =
               try
-                initialize_table_with_arguments (Hashtbl.create 128)
-                  class_arguments constructor.arguments ctx class_table
-              with Invalid_argument message -> error message in
-            new_variable_table
-            >>= fun (var_table, _) ->
-            check_call_constructor constructor.body object_class
-              constructor.call_constructor
-            >>= fun class_body ->
-            interpret_statements class_body
-              { new_ctx with
-                variables_table= var_table
+                prepare_table_with_args_exn (Hashtbl.create 100) c_args
+                  constr_r.arguments ctx class_table
+              with Invalid_argument m -> error m in
+            get_new_var_table
+            >>= fun (vt, _) ->
+            prepare_constructor_block constr_r.body obj_class
+              constr_r.call_constructor
+            >>= fun c_body ->
+            eval_stmt c_body
+              { initres_ctx with
+                var_table= vt
               ; is_creation= true
               ; is_main_scope= false
-              ; constructor_affilation= Some object_class.this_key
-              ; current_constructor_key= Some constructor.key }
+              ; constr_affilation= Some obj_class.this_key
+              ; cur_constr_key= Some constr_r.key }
               class_table
-            >>= fun class_ctx ->
+            >>= fun c_ctx ->
             return
               { ctx with
-                last_expression_result=
-                  VObjectReference class_ctx.current_object
-              ; runtime_flag= NoFlag
-              ; objects_created_count= class_ctx.objects_created_count }
+                last_expr_result= VObjectReference c_ctx.cur_object
+              ; runtime_signal= NoSignal
+              ; obj_created_cnt= c_ctx.obj_created_cnt }
       | Assign (Identifier var_key, val_expr) ->
-          interpret_expressions val_expr ctx class_table
-          >>= fun val_ctx ->
-          update_identifier_value var_key val_ctx.last_expression_result val_ctx
-      | Assign (AccessByPoint (obj_expr, Identifier field_name), val_expr) ->
-          interpret_expressions val_expr ctx class_table
-          >>= fun val_ctx ->
-          update_field_value obj_expr field_name val_ctx class_table
+          eval_expr val_expr ctx class_table
+          >>= fun val_evaled_ctx ->
+          update_identifier_v var_key val_evaled_ctx.last_expr_result
+            val_evaled_ctx
+      | Assign (AccessByPoint (obj_expr, Identifier f_name), val_expr) ->
+          eval_expr val_expr ctx class_table
+          >>= fun val_evaled_ctx ->
+          update_field_v obj_expr f_name val_evaled_ctx class_table
       | Assign (ArrayAccess (arr_expr, index_expr), val_expr) -> (
-          interpret_expressions val_expr ctx class_table
-          >>= fun val_ctx ->
-          interpret_expressions arr_expr val_ctx class_table
-          >>= fun arr_ctx ->
-          interpret_expressions index_expr arr_ctx class_table
-          >>= fun index_ctx ->
-          match arr_ctx.last_expression_result with
+          eval_expr val_expr ctx class_table
+          >>= fun val_evaled_ctx ->
+          eval_expr arr_expr val_evaled_ctx class_table
+          >>= fun arr_evaled_ctx ->
+          eval_expr index_expr arr_evaled_ctx class_table
+          >>= fun index_evaled_ctx ->
+          match arr_evaled_ctx.last_expr_result with
           | VArray arr -> (
-            match index_ctx.last_expression_result with
+            match index_evaled_ctx.last_expr_result with
             | VInt i -> (
-                let new_val = val_ctx.last_expression_result in
+                let new_val = val_evaled_ctx.last_expr_result in
                 try
-                  update_array_state arr i new_val index_ctx
+                  update_array_state_exn arr i new_val index_evaled_ctx
                   |> fun _ ->
-                  return {index_ctx with last_expression_result= new_val}
-                with Invalid_argument message | Failure message ->
-                  error message )
+                  return {index_evaled_ctx with last_expr_result= new_val}
+                with Invalid_argument m | Failure m -> error m )
             | _ -> error "Wrong type for array index" )
           | _ -> error "Wrong type for array asssignment" )
-      | PostInc (AccessByPoint (obj_expr, Identifier field))
-       |PrefInc (AccessByPoint (obj_expr, Identifier field)) ->
-          interpret_expressions
+      | PostInc (AccessByPoint (obj_expr, Identifier f))
+       |PrefInc (AccessByPoint (obj_expr, Identifier f)) ->
+          eval_expr
             (Assign
-               ( AccessByPoint (obj_expr, Identifier field)
-               , Add (AccessByPoint (obj_expr, Identifier field), Value (VInt 1))
-               ))
+               ( AccessByPoint (obj_expr, Identifier f)
+               , Add (AccessByPoint (obj_expr, Identifier f), Value (VInt 1)) ))
             ctx class_table
-      | PostInc (Identifier variable_key) | PrefInc (Identifier variable_key) ->
-          interpret_expressions
+      | PostInc (Identifier var_key) | PrefInc (Identifier var_key) ->
+          eval_expr
             (Assign
-               ( Identifier variable_key
-               , Add (Identifier variable_key, Value (VInt 1)) ))
+               (Identifier var_key, Add (Identifier var_key, Value (VInt 1))))
             ctx class_table
       | PostInc (ArrayAccess (arr_expr, index_expr))
        |PrefInc (ArrayAccess (arr_expr, index_expr)) ->
-          interpret_expressions
+          eval_expr
             (Assign
                ( ArrayAccess (arr_expr, index_expr)
                , Add (ArrayAccess (arr_expr, index_expr), Value (VInt 1)) ))
             ctx class_table
-      | PostDec (AccessByPoint (obj_expr, Identifier field))
-       |PrefDec (AccessByPoint (obj_expr, Identifier field)) ->
-          interpret_expressions
+      | PostDec (AccessByPoint (obj_expr, Identifier f))
+       |PrefDec (AccessByPoint (obj_expr, Identifier f)) ->
+          eval_expr
             (Assign
-               ( AccessByPoint (obj_expr, Identifier field)
-               , Sub (AccessByPoint (obj_expr, Identifier field), Value (VInt 1))
-               ))
+               ( AccessByPoint (obj_expr, Identifier f)
+               , Sub (AccessByPoint (obj_expr, Identifier f), Value (VInt 1)) ))
             ctx class_table
-      | PostDec (Identifier variable_key) | PrefDec (Identifier variable_key) ->
-          interpret_expressions
+      | PostDec (Identifier var_key) | PrefDec (Identifier var_key) ->
+          eval_expr
             (Assign
-               ( Identifier variable_key
-               , Sub (Identifier variable_key, Value (VInt 1)) ))
+               (Identifier var_key, Sub (Identifier var_key, Value (VInt 1))))
             ctx class_table
       | PostDec (ArrayAccess (arr_expr, index_expr))
        |PrefDec (ArrayAccess (arr_expr, index_expr)) ->
-          interpret_expressions
+          eval_expr
             (Assign
                ( ArrayAccess (arr_expr, index_expr)
                , Sub (ArrayAccess (arr_expr, index_expr), Value (VInt 1)) ))
             ctx class_table
-      | _ -> error "Wrong expression construction!" in
-    expressions_type_check expression context class_table
-    >>= fun _ -> interpret_expressions expression context class_table
+      | _ -> error "Wrong expression construction" in
+    expr_type_check expr ectx class_table >>= fun _ -> eval_e expr ectx
 
-  and check_call_constructor current_body current_class current_call_constructor
-      =
+  and update_identifier_v var_key new_val val_evaled_ctx =
+    if Hashtbl.mem val_evaled_ctx.var_table var_key then (
+      get_elem_if_present_m val_evaled_ctx.var_table var_key
+      >>= fun old_var ->
+      check_assign_cnt_v old_var
+      >>= fun _ ->
+      Hashtbl.replace val_evaled_ctx.var_table var_key
+        { old_var with
+          v_value= new_val
+        ; assignment_count= old_var.assignment_count + 1 } ;
+      return val_evaled_ctx )
+    else
+      match val_evaled_ctx.cur_object with
+      | NullObjectReference -> error "NullReferenceException"
+      | ObjectReference {field_references_table= cur_frt; _} ->
+          if Hashtbl.mem cur_frt var_key then
+            get_elem_if_present_m cur_frt var_key
+            >>= fun old_field ->
+            check_assign_cnt_f old_field
+            >>= fun _ ->
+            if val_evaled_ctx.is_creation then
+              Hashtbl.replace cur_frt var_key
+                {old_field with field_value= val_evaled_ctx.last_expr_result}
+              |> fun _ -> return val_evaled_ctx
+            else
+              try
+                update_object_state_exn val_evaled_ctx.cur_object var_key
+                  val_evaled_ctx.last_expr_result val_evaled_ctx
+                |> fun _ -> return val_evaled_ctx
+              with
+              | Invalid_argument m -> error m
+              | Not_found -> error "No such field"
+          else error "No such variable"
+
+  and update_field_v obj_expr f_name val_evaled_ctx class_table =
+    eval_expr obj_expr val_evaled_ctx class_table
+    >>= fun obj_evaled_ctx ->
+    let obj_r = get_obj_value obj_evaled_ctx.last_expr_result in
+    let new_val = val_evaled_ctx.last_expr_result in
+    try
+      get_object_info obj_r
+      |> fun (_, frt, _) ->
+      if Hashtbl.mem frt f_name then
+        get_elem_if_present_m frt f_name
+        >>= fun old_field ->
+        check_assign_cnt_f old_field
+        >>= fun _ ->
+        if obj_evaled_ctx.is_creation then
+          Hashtbl.replace frt f_name
+            {old_field with field_value= val_evaled_ctx.last_expr_result}
+          |> fun _ -> return obj_evaled_ctx
+        else
+          update_object_state_exn obj_r f_name new_val obj_evaled_ctx
+          |> fun _ -> return obj_evaled_ctx
+      else error "No such field in class"
+    with
+    | Invalid_argument m | Failure m -> error m
+    | Not_found -> error "No such field"
+
+  and update_array_state_exn arr index new_value update_ctx =
+    let rec update_states f_ht i n_val a_n =
+      Hashtbl.iter
+        (fun _ field_ref ->
+          match field_ref with
+          | {key= f_key; field_value= f_val; _} -> (
+            match f_val with
+            | VArray
+                (ArrayReference
+                  {array_type= at; array_values= cur_values; number= cur_num})
+              -> (
+                if cur_num = a_n then
+                  Hashtbl.replace f_ht f_key
+                    { field_ref with
+                      field_value=
+                        update_array_value
+                          (VArray
+                             (ArrayReference
+                                { array_type= at
+                                ; array_values= cur_values
+                                ; number= cur_num }))
+                          i n_val } ;
+                match at with
+                | TClass _ ->
+                    List.iter
+                      (fun v ->
+                        match v with
+                        | VObjectReference
+                            (ObjectReference {field_references_table= frt; _})
+                          ->
+                            update_states frt i n_val a_n
+                        | _ -> ())
+                      cur_values
+                | _ -> () )
+            | VObjectReference
+                (ObjectReference {field_references_table= frt; _}) ->
+                update_states frt i n_val a_n
+            | _ -> () ))
+        f_ht in
+    let rec helper_update i n_val u_ctx a_n =
+      Hashtbl.iter
+        (fun v_key var ->
+          match var.v_value with
+          | VObjectReference (ObjectReference {field_references_table= frt; _})
+            ->
+              update_states frt i n_val a_n
+          | VArray
+              (ArrayReference
+                {array_type= at; array_values= cur_values; number= cur_num})
+            -> (
+              if cur_num = a_n then
+                Hashtbl.replace u_ctx.var_table v_key
+                  { var with
+                    v_value=
+                      update_array_value
+                        (VArray
+                           (ArrayReference
+                              { array_type= at
+                              ; array_values= cur_values
+                              ; number= cur_num }))
+                        i n_val }
+                |> fun () ->
+                match at with
+                | TClass _ ->
+                    List.iter
+                      (fun v ->
+                        match v with
+                        | VObjectReference
+                            (ObjectReference {field_references_table= frt; _})
+                          ->
+                            update_states frt i n_val a_n
+                        | _ -> ())
+                      cur_values
+                | _ -> () )
+          | _ -> ())
+        u_ctx.var_table
+      |> fun () ->
+      match u_ctx.prev_context with
+      | None -> ()
+      | Some prev_ctx -> helper_update i n_val prev_ctx a_n in
+    get_array_info arr
+    |> fun (_, _, a_number) -> helper_update index new_value update_ctx a_number
+
+  and update_object_state_exn obj field_key new_value update_ctx =
+    let rec update_states f_ht f_key n_val o_num assign_cnt =
+      Hashtbl.iter
+        (fun _ field_ref ->
+          match field_ref with
+          | {field_value= f_val; _} -> (
+            match f_val with
+            | VObjectReference
+                (ObjectReference {field_references_table= frt; number= fnum; _})
+              ->
+                ( if fnum = o_num then
+                  match get_element_option frt f_key with
+                  | None -> raise Not_found
+                  | Some old_field ->
+                      Hashtbl.replace frt f_key
+                        { old_field with
+                          field_value= n_val
+                        ; assignments_count= assign_cnt } ) ;
+                update_states frt f_key n_val o_num assign_cnt
+            | VArray
+                (ArrayReference {array_type= TClass _; array_values= v_list; _})
+              ->
+                List.iter
+                  (fun v ->
+                    match v with
+                    | VObjectReference
+                        (ObjectReference
+                          {field_references_table= frt; number= c_num; _}) ->
+                        ( if c_num = o_num then
+                          match get_element_option frt f_key with
+                          | None -> raise Not_found
+                          | Some old_field ->
+                              Hashtbl.replace frt f_key
+                                { old_field with
+                                  field_value= n_val
+                                ; assignments_count= assign_cnt } ) ;
+                        update_states frt f_key n_val o_num assign_cnt
+                    | _ -> ())
+                  v_list
+            | _ -> () ))
+        f_ht in
+    let rec helper_update f_key n_val u_ctx o_num assign_cnt =
+      Hashtbl.iter
+        (fun _ var ->
+          match var.v_value with
+          | VObjectReference
+              (ObjectReference {field_references_table= frt; number= fnum; _})
+            ->
+              if o_num = fnum then (
+                match get_element_option frt f_key with
+                | None -> raise Not_found
+                | Some old_field ->
+                    Hashtbl.replace frt f_key
+                      { old_field with
+                        field_value= n_val
+                      ; assignments_count= assign_cnt } ;
+                    update_states frt f_key n_val o_num assign_cnt )
+              else update_states frt f_key n_val o_num assign_cnt
+          | VArray
+              (ArrayReference {array_type= TClass _; array_values= v_list; _})
+            ->
+              List.iter
+                (fun v ->
+                  match v with
+                  | VObjectReference
+                      (ObjectReference
+                        {field_references_table= frt; number= c_num; _}) ->
+                      ( if c_num = o_num then
+                        match get_element_option frt f_key with
+                        | None -> raise Not_found
+                        | Some old_field ->
+                            Hashtbl.replace frt f_key
+                              { old_field with
+                                field_value= n_val
+                              ; assignments_count= assign_cnt } )
+                      |> fun () ->
+                      update_states frt f_key n_val o_num assign_cnt
+                  | _ -> ())
+                v_list
+          | _ -> ())
+        u_ctx.var_table
+      |> fun () ->
+      match u_ctx.prev_context with
+      | None -> ()
+      | Some prev_ctx -> helper_update f_key n_val prev_ctx o_num assign_cnt
+    in
+    get_object_info obj
+    |> fun (_, object_frt, object_number) ->
+    ( match get_element_option object_frt field_key with
+    | None -> raise Not_found
+    | Some f -> f.assignments_count + 1 )
+    |> fun assign_cnt ->
+    helper_update field_key new_value update_ctx object_number assign_cnt
+
+  and prepare_table_with_args_exn ht args_l m_arg_list pr_ctx class_table =
+    mfold_left2
+      (fun (h_ht, hctx) arg tn_pair ->
+        match tn_pair with
+        | head_type, Name head_name ->
+            eval_expr arg hctx class_table
+            >>= fun he_ctx ->
+            Hashtbl.add h_ht head_name
+              { v_type= head_type
+              ; v_key= head_name
+              ; is_const= false
+              ; assignment_count= 1
+              ; v_value= he_ctx.last_expr_result
+              ; scope_level= 0 } ;
+            return (h_ht, he_ctx))
+      (ht, pr_ctx) args_l m_arg_list
+
+  (* and prepare_constructor_block current_body current_class
+       current_call_constructor =
+     match current_body with
+     | StatementBlock _ -> (
+       match current_call_constructor with
+       | Some call_method ->
+         (match call_method with
+         | CallMethod(Base, _) ->
+           (if current_class.parent_key = None then error "base() call in constructor in not child class"
+           else eval_expr call_method )
+         | CallMethod(This, _) -> return current_body
+         | _ -> error "Invalid constructor call: it can only be base(...) or this(...)")
+       | None -> return current_body)
+     | _ -> error "Must be statement block in constructor" *)
+  and prepare_constructor_block current_body current_class
+      current_call_constructor =
     match current_body with
     | StatementBlock _ -> (
       match (current_call_constructor, current_class.parent_key) with
       | Some (CallMethod (Base, _)), None ->
-          error "Base() call in constructor in not child class"
+          error "base() call in constructor in not child class"
       | Some (CallMethod (Base, _)), Some _ -> return current_body
       | Some (CallMethod (This, _)), _ -> return current_body
       | None, _ -> return current_body
       | _ -> error "Incorrect call constructor in constructor" )
     | _ -> error "Must be statement block in constructor"
 
-  and initialize_table_with_arguments ht argument_list method_argument_list ctx
-      class_table =
-    fold_left2
-      (fun (current_ht, current_ctx) argument type_name_pair ->
-        match type_name_pair with
-        | current_type, Name current_name ->
-            interpret_expressions argument current_ctx class_table
-            >>= fun new_ctx ->
-            Hashtbl.add current_ht current_name
-              { variable_type= current_type
-              ; variable_key= current_name
-              ; is_const= false
-              ; assignments_count= 1
-              ; variable_value= new_ctx.last_expression_result
-              ; scope_level= 0 } ;
-            return (current_ht, new_ctx))
-      (ht, ctx) argument_list method_argument_list
-
-  and update_identifier_value variable_key new_value value_ctx =
-    if Hashtbl.mem value_ctx.variables_table variable_key then (
-      get_element value_ctx.variables_table variable_key
-      >>= fun old_variable ->
-      variable_check_assign_count old_variable
-      >>= fun _ ->
-      Hashtbl.replace value_ctx.variables_table variable_key
-        { old_variable with
-          variable_value= new_value
-        ; assignments_count= old_variable.assignments_count + 1 } ;
-      return value_ctx )
-    else
-      match value_ctx.current_object with
-      | NullObjectReference -> error "NullReferenceException"
-      | ObjectReference {field_references_table= frt; _} ->
-          if Hashtbl.mem frt variable_key then
-            get_element frt variable_key
-            >>= fun old_field ->
-            field_check_assign_count old_field
-            >>= fun _ ->
-            if value_ctx.is_creation then
-              Hashtbl.replace frt variable_key
-                {old_field with field_value= value_ctx.last_expression_result}
-              |> fun _ -> return value_ctx
-            else
-              try
-                update_object_state value_ctx.current_object variable_key
-                  value_ctx.last_expression_result value_ctx
-                |> fun _ -> return value_ctx
-              with
-              | Invalid_argument message -> error message
-              | Not_found -> error "No such field"
-          else error "No such variable"
-
-  and update_field_value obj_expr field_name value_ctx class_table =
-    interpret_expressions obj_expr value_ctx class_table
-    >>= fun obj_ctx ->
-    let obj = get_object_value obj_ctx.last_expression_result in
-    let new_value = value_ctx.last_expression_result in
-    try
-      get_object_info obj
-      |> fun (_, frt, _) ->
-      if Hashtbl.mem frt field_name then
-        get_element frt field_name
-        >>= fun old_field ->
-        field_check_assign_count old_field
-        >>= fun _ ->
-        if obj_ctx.is_creation then
-          Hashtbl.replace frt field_name
-            {old_field with field_value= value_ctx.last_expression_result}
-          |> fun _ -> return obj_ctx
-        else
-          update_object_state obj field_name new_value obj_ctx
-          |> fun _ -> return obj_ctx
-      else error "No such field in class"
-    with
-    | Invalid_argument message | Failure message -> error message
-    | Not_found -> error "No such field"
-
-  and update_object_state obj field_key new_value update_ctx =
-    let rec update_states ht field_key new_value obj_number assign_count =
-      Hashtbl.iter
-        (fun _ field_reference ->
-          match field_reference with
-          | {field_value= field_val; _} -> (
-            match field_val with
-            | VObjectReference
-                (ObjectReference {field_references_table= frt; number= num; _})
-              ->
-                ( if num = obj_number then
-                  match get_element_option frt field_key with
-                  | None -> raise Not_found
-                  | Some old_field ->
-                      Hashtbl.replace frt field_key
-                        { old_field with
-                          field_value= new_value
-                        ; assignments_count= assign_count } ) ;
-                update_states frt field_key new_value obj_number assign_count
-            | VArray
-                (ArrayReference
-                  {array_type= TClass _; array_values= value_list; _}) ->
-                List.iter
-                  (fun value ->
-                    match value with
-                    | VObjectReference
-                        (ObjectReference
-                          {field_references_table= frt; number= num; _}) ->
-                        ( if num = obj_number then
-                          match get_element_option frt field_key with
-                          | None -> raise Not_found
-                          | Some old_field ->
-                              Hashtbl.replace frt field_key
-                                { old_field with
-                                  field_value= new_value
-                                ; assignments_count= assign_count } ) ;
-                        update_states frt field_key new_value obj_number
-                          assign_count
-                    | _ -> ())
-                  value_list
-            | _ -> () ))
-        ht in
-    let rec helper_update field_key new_value ctx obj_num assign_count =
-      Hashtbl.iter
-        (fun _ variable ->
-          match variable.variable_value with
-          | VObjectReference
-              (ObjectReference {field_references_table= frt; number= num; _}) ->
-              if obj_num = num then (
-                match get_element_option frt field_key with
-                | None -> raise Not_found
-                | Some old_field ->
-                    Hashtbl.replace frt field_key
-                      { old_field with
-                        field_value= new_value
-                      ; assignments_count= assign_count } ;
-                    update_states frt field_key new_value obj_num assign_count )
-              else update_states frt field_key new_value obj_num assign_count
-          | VArray
-              (ArrayReference
-                {array_type= TClass _; array_values= value_list; _}) ->
-              List.iter
-                (fun value ->
-                  match value with
-                  | VObjectReference
-                      (ObjectReference
-                        {field_references_table= frt; number= num; _}) ->
-                      ( if num = obj_num then
-                        match get_element_option frt field_key with
-                        | None -> raise Not_found
-                        | Some old_field ->
-                            Hashtbl.replace frt field_key
-                              { old_field with
-                                field_value= new_value
-                              ; assignments_count= assign_count } )
-                      |> fun () ->
-                      update_states frt field_key new_value obj_num assign_count
-                  | _ -> ())
-                value_list
-          | _ -> ())
-        ctx.variables_table
-      |> fun () ->
-      match ctx.previous_context with
-      | None -> ()
-      | Some previous_ctx ->
-          helper_update field_key new_value previous_ctx obj_num assign_count
-    in
-    get_object_info obj
-    |> fun (_, object_frt, object_number) ->
-    ( match get_element_option object_frt field_key with
-    | None -> raise Not_found
-    | Some field -> field.assignments_count + 1 )
-    |> fun assignments_count ->
-    helper_update field_key new_value update_ctx object_number assignments_count
-
-  and update_array_state array index new_value update_ctx =
-    let rec update_states ht i new_value array_number =
-      Hashtbl.iter
-        (fun _ field_reference ->
-          match field_reference with
-          | {key= field_key; field_value= field_val; _} -> (
-            match field_val with
-            | VArray
-                (ArrayReference
-                  { array_type= arr_type
-                  ; array_values= current_values
-                  ; number= current_number }) -> (
-                if current_number = array_number then
-                  Hashtbl.replace ht field_key
-                    { field_reference with
-                      field_value=
-                        update_array_value
-                          (VArray
-                             (ArrayReference
-                                { array_type= arr_type
-                                ; array_values= current_values
-                                ; number= current_number }))
-                          i new_value } ;
-                match arr_type with
-                | TClass _ ->
-                    List.iter
-                      (fun value ->
-                        match value with
-                        | VObjectReference
-                            (ObjectReference {field_references_table= frt; _})
-                          ->
-                            update_states frt i new_value array_number
-                        | _ -> ())
-                      current_values
-                | _ -> () )
-            | VObjectReference
-                (ObjectReference {field_references_table= frt; _}) ->
-                update_states frt i new_value array_number
-            | _ -> () ))
-        ht in
-    let rec helper_update i new_value ctx array_number =
-      Hashtbl.iter
-        (fun variable_key variable ->
-          match variable.variable_value with
-          | VObjectReference (ObjectReference {field_references_table= frt; _})
-            ->
-              update_states frt i new_value array_number
-          | VArray
-              (ArrayReference
-                { array_type= arr_type
-                ; array_values= current_values
-                ; number= current_number }) -> (
-              if current_number = array_number then
-                Hashtbl.replace ctx.variables_table variable_key
-                  { variable with
-                    variable_value=
-                      update_array_value
-                        (VArray
-                           (ArrayReference
-                              { array_type= arr_type
-                              ; array_values= current_values
-                              ; number= current_number }))
-                        i new_value }
-                |> fun () ->
-                match arr_type with
-                | TClass _ ->
-                    List.iter
-                      (fun value ->
-                        match value with
-                        | VObjectReference
-                            (ObjectReference {field_references_table= frt; _})
-                          ->
-                            update_states frt i new_value array_number
-                        | _ -> ())
-                      current_values
-                | _ -> () )
-          | _ -> ())
-        ctx.variables_table
-      |> fun () ->
-      match ctx.previous_context with
-      | None -> ()
-      | Some previous_ctx -> helper_update i new_value previous_ctx array_number
-    in
-    get_array_info array
-    |> fun (_, _, arr_number) ->
-    helper_update index new_value update_ctx arr_number
-
-  let execute ht =
+  let execute : (key_t, class_t) Hashtbl.t -> context M.t =
+   fun ht ->
     find_class_with_main ht
-    >>= fun class_t ->
-    context_initialize
+    >>= fun cl ->
+    make_context
       (ObjectReference
-         { class_key= class_t.this_key
-         ; field_references_table= Hashtbl.create 16
+         { class_key= cl.this_key
+         ; field_references_table= Hashtbl.create 10
          ; number= 0 })
-      (Hashtbl.create 16)
+      (Hashtbl.create 10)
     >>= fun ctx ->
-    let main = Hashtbl.find class_t.methods_table "Main" in
+    let main = Hashtbl.find cl.methods_table "Main" in
     match main.body with
     | None -> error "Main() method cannot be abstract"
-    | Some main_body -> interpret_statements main_body ctx ht
+    | Some body_main -> eval_stmt body_main ctx ht
 end
