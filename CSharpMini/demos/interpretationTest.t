@@ -508,7 +508,7 @@
      assignments_count = 1 }
   
   "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("");
+   { key = "name"; field_type = TString; field_value = VString ("Alice");
      is_const = false; assignments_count = 0 }
   
   ]]
@@ -516,25 +516,10 @@
   }
   
   ]]
-  ;
-  last_expr_result =
-  VObjectReference (ObjectReference ({ class_key = "Person";
-                                       field_references_table =
-                                       [["age" ->
-                                          { key = "age"; field_type = TInt;
-                                            field_value = VInt (27);
-                                            is_const = false;
-                                            assignments_count = 1 }
-                                       
-  "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("Bob");
-     is_const = false; assignments_count = 0 }
-  
-  ]]
-  ; number = 1 })); runtime_signal = NoSignal; curr_method_type = TVoid;
-  is_main_scope = true; nested_loops_cnt = 0; scope_level = 0;
-  cur_constr_key = None; prev_context = None; obj_created_cnt = 4;
-  is_creation = false; constr_affilation = None
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = TVoid; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 4; is_creation = false; constr_affilation = None
   }
   
   -_-_-_-_-_-_-_-_-_-_- Scope testing -_-_-_-_-_-_-_-_-_-_-
@@ -671,7 +656,7 @@
      scope_level = 0 }
   
   ]]
-  ; last_expr_result = VBool (false); runtime_signal = NoSignal;
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
   curr_method_type = TVoid; is_main_scope = true; nested_loops_cnt = 0;
   scope_level = 0; cur_constr_key = None; prev_context = None;
   obj_created_cnt = 2; is_creation = false; constr_affilation = None
@@ -753,25 +738,10 @@
   }
   
   ]]
-  ;
-  last_expr_result =
-  VObjectReference (ObjectReference ({ class_key = "Person";
-                                       field_references_table =
-                                       [["age" ->
-                                          { key = "age"; field_type = TInt;
-                                            field_value = VInt (30);
-                                            is_const = false;
-                                            assignments_count = 1 }
-                                       
-  "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("Bob");
-     is_const = false; assignments_count = 0 }
-  
-  ]]
-  ; number = 1 })); runtime_signal = NoSignal; curr_method_type = TVoid;
-  is_main_scope = true; nested_loops_cnt = 0; scope_level = 0;
-  cur_constr_key = None; prev_context = None; obj_created_cnt = 2;
-  is_creation = false; constr_affilation = None
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = TVoid; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 2; is_creation = false; constr_affilation = None
   }
   
   -_-_-_-_-_-_-_-_-_-_- Pattern Visitor testing -_-_-_-_-_-_-_-_-_-_-
@@ -953,7 +923,7 @@
      v_value = VInt (0); scope_level = 0 }
   
   ]]
-  ; last_expr_result = VBool (false); runtime_signal = NoSignal;
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
   curr_method_type = TVoid; is_main_scope = true; nested_loops_cnt = 0;
   scope_level = 0; cur_constr_key = None; prev_context = None;
   obj_created_cnt = 2; is_creation = false; constr_affilation = None
@@ -978,7 +948,7 @@
                                               [["age" ->
                                                  { key = "age";
                                                    field_type = TInt;
-                                                   field_value = VInt (0);
+                                                   field_value = VInt (2);
                                                    is_const = false;
                                                    assignments_count = 0 }
                                               
@@ -987,7 +957,7 @@
      is_const = false; assignments_count = 0 }
   
   "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("");
+   { key = "name"; field_type = TString; field_value = VString ("Mars");
      is_const = false; assignments_count = 0 }
   
   ]]
@@ -1001,7 +971,7 @@
                                        field_references_table =
                                        [["age" ->
                                           { key = "age"; field_type = TInt;
-                                            field_value = VInt (0);
+                                            field_value = VInt (2);
                                             is_const = false;
                                             assignments_count = 0 }
                                        
@@ -1010,7 +980,7 @@
      is_const = false; assignments_count = 0 }
   
   "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("");
+   { key = "name"; field_type = TString; field_value = VString ("Mars");
      is_const = false; assignments_count = 0 }
   
   ]]
@@ -1022,62 +992,7 @@
   
   -_-_-_-_-_-_-_-_-_-_- Constructor chaining recursion testing -_-_-_-_-_-_-_-_-_-_-
   
-  { cur_object =
-    ObjectReference ({ class_key = "Program"; field_references_table = [[]]
-                                              ;
-                       number = 0 });
-    var_table =
-    [["cat" ->
-       { v_type = TClass ("Cat"); v_key = "cat"; is_const = false;
-         assignment_count = 1;
-         v_value =
-         VObjectReference (ObjectReference ({ class_key = "Cat";
-                                              field_references_table =
-                                              [["age" ->
-                                                 { key = "age";
-                                                   field_type = TInt;
-                                                   field_value = VInt (0);
-                                                   is_const = false;
-                                                   assignments_count = 0 }
-                                              
-  "hairLevel" ->
-   { key = "hairLevel"; field_type = TInt; field_value = VInt (0);
-     is_const = false; assignments_count = 0 }
-  
-  "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("");
-     is_const = false; assignments_count = 0 }
-  
-  ]]
-  ; number = 1 })); scope_level = 0
-  }
-  
-  ]]
-  ;
-  last_expr_result =
-  VObjectReference (ObjectReference ({ class_key = "Cat";
-                                       field_references_table =
-                                       [["age" ->
-                                          { key = "age"; field_type = TInt;
-                                            field_value = VInt (0);
-                                            is_const = false;
-                                            assignments_count = 0 }
-                                       
-  "hairLevel" ->
-   { key = "hairLevel"; field_type = TInt; field_value = VInt (0);
-     is_const = false; assignments_count = 0 }
-  
-  "name" ->
-   { key = "name"; field_type = TString; field_value = VString ("");
-     is_const = false; assignments_count = 0 }
-  
-  ]]
-  ; number = 1 })); runtime_signal = NoSignal; curr_method_type = TVoid;
-  is_main_scope = true; nested_loops_cnt = 0; scope_level = 0;
-  cur_constr_key = None; prev_context = None; obj_created_cnt = 1;
-  is_creation = false; constr_affilation = None
-  }
-  
+  Constructor recursion
   -_-_-_-_-_-_-_-_-_-_- Const fields testing -_-_-_-_-_-_-_-_-_-_-
   
   Assignment to a constant field

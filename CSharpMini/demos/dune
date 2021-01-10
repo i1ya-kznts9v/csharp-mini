@@ -8,7 +8,6 @@
  (name parserTest)
  (modules parserTest)
  (libraries CSharpMini.Lib)
- (modes byte exe)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
 
@@ -16,7 +15,6 @@
  (name parserVisitorPatternTest)
  (modules parserVisitorPatternTest)
  (libraries CSharpMini.Lib)
- (modes byte exe)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
 
@@ -24,7 +22,6 @@
  (name classLoaderTest)
  (modules classLoaderTest)
  (libraries CSharpMini.Lib)
- (modes byte exe)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
 
@@ -32,6 +29,5 @@
  (name interpretationTest)
  (modules interpretationTest)
  (libraries CSharpMini.Lib)
- (modes byte exe)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))

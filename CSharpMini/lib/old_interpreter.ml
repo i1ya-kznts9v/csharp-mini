@@ -1,3 +1,4 @@
+(*This version of the interpreter was used only for debugging, all its results are applied in the used version*)
 open Ast
 open Parser
 open Operators

@@ -2,7 +2,10 @@
  (name REPL)
  (public_name CSharpMini.Repl)
  (modules REPL)
- (libraries CSharpMini.Lib))
+ (libraries CSharpMini.Lib str)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
 
 (cram
- (deps demos/parserTest.exe))
+ (deps demos/parserTest.exe demos/classLoaderTest.exe
+   demos/parserVisitorPatternTest.exe demos/interpretationTest.exe))

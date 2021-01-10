@@ -1249,16 +1249,19 @@ module Interpretation (M : MONADERROR) = struct
         >>= fun rctx ->
         let l_value = lctx.last_expr_result in
         let r_value = rctx.last_expr_result in
-        let new_value = op l_value r_value in
-        try return {rctx with last_expr_result= new_value} with
+        try
+          let new_value = op l_value r_value in
+          return {rctx with last_expr_result= new_value}
+        with
         | Invalid_argument m -> error m
         | Division_by_zero -> error "Division by zero" in
       let eval_un v_expr op =
         eval_expr v_expr ctx class_table
         >>= fun vctx ->
         let v = vctx.last_expr_result in
-        let new_v = op v in
-        try return {vctx with last_expr_result= new_v}
+        try
+          let new_v = op v in
+          return {vctx with last_expr_result= new_v}
         with Invalid_argument m -> error m in
       match e_expr with
       | Add (left, right) -> eval_op left right ( ++ )
@@ -1445,7 +1448,9 @@ module Interpretation (M : MONADERROR) = struct
                 >>= fun m_res_ctx ->
                 return
                   { new_ctx with
-                    last_expr_result= m_res_ctx.last_expr_result
+                    last_expr_result=
+                      ( if mr.method_type = TVoid then VVoid
+                      else m_res_ctx.last_expr_result )
                   ; obj_created_cnt= m_res_ctx.obj_created_cnt
                   ; is_creation= false } )
           | _ -> error "Cannot access field of non-object" )
@@ -1958,31 +1963,19 @@ module Interpretation (M : MONADERROR) = struct
             return (h_ht, he_ctx))
       (ht, pr_ctx) args_l m_arg_list
 
-  (* and prepare_constructor_block current_body current_class
-       current_call_constructor =
-     match current_body with
-     | StatementBlock _ -> (
-       match current_call_constructor with
-       | Some call_method ->
-         (match call_method with
-         | CallMethod(Base, _) ->
-           (if current_class.parent_key = None then error "base() call in constructor in not child class"
-           else eval_expr call_method )
-         | CallMethod(This, _) -> return current_body
-         | _ -> error "Invalid constructor call: it can only be base(...) or this(...)")
-       | None -> return current_body)
-     | _ -> error "Must be statement block in constructor" *)
   and prepare_constructor_block current_body current_class
       current_call_constructor =
     match current_body with
-    | StatementBlock _ -> (
+    | StatementBlock body -> (
       match (current_call_constructor, current_class.parent_key) with
       | Some (CallMethod (Base, _)), None ->
           error "base() call in constructor in not child class"
-      | Some (CallMethod (Base, _)), Some _ -> return current_body
-      | Some (CallMethod (This, _)), _ -> return current_body
+      | Some (CallMethod (Base, _) as call_constructor), Some _ ->
+          return (StatementBlock (Expression call_constructor :: body))
+      | Some (CallMethod (This, _) as call_constructor), _ ->
+          return (StatementBlock (Expression call_constructor :: body))
       | None, _ -> return current_body
-      | _ -> error "Incorrect call constructor in constructor" )
+      | _ -> error "Incorrect constructor call in constructor" )
     | _ -> error "Must be statement block in constructor"
 
   let execute : (key_t, class_t) Hashtbl.t -> context M.t =
