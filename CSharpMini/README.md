@@ -1,6 +1,6 @@
 ### An implementaion of CSharpMini language in Ocaml
 
-This is a homework for functional programming course.
+This is a homework for functional programming course
 
 License: LGPL
 
