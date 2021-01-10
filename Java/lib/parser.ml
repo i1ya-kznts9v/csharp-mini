@@ -12,9 +12,9 @@ let reserved =
     "final";
     "static";
     "int";
-    "String";
     "void";
     "boolean";
+    "char";
     "for";
     "null";
     "new";
@@ -48,6 +48,8 @@ let modifier input =
       token "abstract" >> return Abstract;
     ]
     input
+
+let final = token "final" >> return Final
 
 let ident =
   spaces >> letter <~> many alpha_num => implode >>= function
@@ -93,6 +95,13 @@ module Expr = struct
   let%test _ =
     apply constString "\"hello world!\"" = Some (Const (VString "hello world!"))
 
+  let constChar =
+    token "'" >> any >>= fun ch -> token "'" >> return (Const (VChar ch))
+
+  let%test _ = apply constChar "'\n'" = Some (Const (VChar '\n'))
+
+  let%test _ = apply constChar "'c'" = Some (Const (VChar 'c'))
+
   let identifier = ident => fun s -> Identifier s
 
   let%test _ = apply identifier "IdentSample" = Some (Identifier "IdentSample")
@@ -128,7 +137,7 @@ module Expr = struct
   let neq_op = token "!=" >> return (fun x y -> NotEqual (x, y))
 
   let atomic =
-    identifier <|> constInt <|> constString
+    identifier <|> constInt <|> constString <|> constChar
     <|> (token "true" >> return (Const (VBool true)))
     <|> (token "false" >> return (Const (VBool false)))
     <|> null
@@ -146,8 +155,9 @@ module Expr = struct
     choice
       [
         token "int" >> parse_arr_or_type Int;
-        token "String" >> parse_arr_or_type String;
         token "void" >> parse_arr_or_type Void;
+        token "char" >> parse_arr_or_type Char;
+        token "boolean" >> parse_arr_or_type Bool;
         (ident >>= fun class_name -> parse_arr_or_type (ClassName class_name));
       ]
 
@@ -159,14 +169,19 @@ module Expr = struct
 
   let%test _ = apply type_spec_array "void[]" = None
 
+  let%test _ = apply type_spec_array "char[]" = Some (Array Char)
+
+  let%test _ = apply type_spec_array "boolean[]" = Some (Array Bool)
+
   let%test _ = apply type_spec_array "Car[]" = Some (Array (ClassName "Car"))
 
   let type_spec =
     choice
       [
         token "int" >> return Int;
-        token "String" >> return String;
         token "void" >> return Void;
+        token "char" >> return Char;
+        token "boolean" >> return Bool;
         (ident >>= fun class_name -> return (ClassName class_name));
       ]
 
@@ -224,11 +239,14 @@ module Expr = struct
       | other -> FieldAccess (acc, other)
     in
     let f_parse =
-      this <|> super <|> parens create_obj <|> arr_access <|> method_call
-      <|> identifier
+      this <|> null <|> parens create_obj <|> arr_access <|> method_call
+      <|> constString <|> identifier
+    in
+    let n_parse =
+      parens create_obj <|> arr_access <|> method_call <|> identifier
     in
     ( f_parse >>= fun head ->
-      many1 (token "." >> f_parse) => fun tl ->
+      many1 (token "." >> n_parse) => fun tl ->
       List.fold_left fold_arr_field head tl )
       input
 
@@ -241,17 +259,18 @@ module Expr = struct
       input
 
   and create_obj input =
-    ( token "new" >> name >>= fun class_name ->
+    ( token "new " >> name >>= fun class_name ->
       token "(" >> expr_sep_by_comma >>= fun expr_list ->
       token ")" >> return (ClassCreate (class_name, expr_list)) )
       input
 
   and create_arr input =
-    ( token "new" >> type_spec >>= fun ts ->
+    ( token "new " >> type_spec >>= fun ts ->
       choice
         [
           ( token "[]" >> token "{" >> sep_by1 expression (token ",")
-          >>= fun el_list -> return (ArrayCreateElements (ts, el_list)) );
+          >>= fun el_list ->
+            token "}" >> return (ArrayCreateElements (ts, el_list)) );
           ( brackets expression >>= fun size ->
             return (ArrayCreateSized (ts, size)) );
         ] )
@@ -276,10 +295,11 @@ module Stmt = struct
   let%test _ = apply continue_stat "continue;" = Some Continue
 
   let return_stat =
-    token "return "
+    token "return"
     >> choice
          [
-           (expression >>= fun ret -> token ";" >> return (Return (Some ret)));
+           ( skip_many1 space >> expression >>= fun ret ->
+             token ";" >> return (Return (Some ret)) );
            token ";" >> return (Return None);
          ]
 
@@ -310,7 +330,6 @@ module Stmt = struct
         if_stat;
         while_stat;
         for_stat;
-        throw_stat;
         expr_stat;
         stat_block;
       ]
@@ -344,15 +363,22 @@ module Stmt = struct
       >>= (fun value -> return (v_name, Some value))
       <|> return (v_name, None)
     in
-    type_spec_array >>= fun type_specifier ->
-    sep_by1 var_declarator (token ",") >>= fun dec_pairs ->
-    token ";" >> return (VarDec (type_specifier, dec_pairs))
+    choice
+      [
+        ( final >>= fun f ->
+          type_spec_array >>= fun type_specifier ->
+          sep_by1 var_declarator (token ",") >>= fun dec_pairs ->
+          token ";" >> return (VarDec (Some f, type_specifier, dec_pairs)) );
+        ( type_spec_array >>= fun type_specifier ->
+          sep_by1 var_declarator (token ",") >>= fun dec_pairs ->
+          token ";" >> return (VarDec (None, type_specifier, dec_pairs)) );
+      ]
 
   and for_stat input =
     ( token "for" >> token "("
     >> choice
          [
-           (statement >>= fun stat -> return (Some stat));
+           (var_declaration >>= fun stat -> return (Some stat));
            token ";" >> return None;
          ]
     >>= fun dec ->
@@ -366,9 +392,6 @@ module Stmt = struct
       token ")" >> statement >>= fun body ->
       return (For (dec, cond, after, body)) )
       input
-
-  and throw_stat =
-    token "throw" >> expression >>= fun expr -> token ";" >> return (Throw expr)
 end
 
 let method_declaration =
@@ -376,7 +399,6 @@ let method_declaration =
     Expr.type_spec_array >>= fun type_par ->
     name >>= fun id_par -> return (type_par, id_par)
   in
-  many modifier >>= fun modifiers ->
   Expr.type_spec_array >>= fun m_type ->
   name >>= fun m_name ->
   token "(" >> sep_by param (token ",") >>= fun param_list ->
@@ -384,10 +406,8 @@ let method_declaration =
   >> choice
        [
          ( Stmt.stat_block >>= fun st_block ->
-           return
-             (Method (modifiers, m_type, m_name, param_list, Some st_block)) );
-         token ";"
-         >> return (Method (modifiers, m_type, m_name, param_list, None));
+           return (Method (m_type, m_name, param_list, Some st_block)) );
+         token ";" >> return (Method (m_type, m_name, param_list, None));
        ]
 
 let constructor_declaration =
@@ -395,11 +415,10 @@ let constructor_declaration =
     Expr.type_spec_array >>= fun type_par ->
     name >>= fun id_par -> return (type_par, id_par)
   in
-  many modifier >>= fun modifiers ->
   name >>= fun c_name ->
   token "(" >> sep_by param (token ",") >>= fun param_list ->
   token ")" >> Stmt.stat_block >>= fun c_block ->
-  return (Constructor (modifiers, c_name, param_list, c_block))
+  return (Constructor (c_name, param_list, c_block))
 
 let field_declaration =
   let var_declarator =
@@ -408,13 +427,14 @@ let field_declaration =
     >>= (fun value -> return (name, Some value))
     <|> return (name, None)
   in
-  many modifier >>= fun modifiers ->
   Expr.type_spec_array >>= fun type_specifier ->
   sep_by var_declarator (token ",") >>= fun dec_pairs ->
-  token ";" >> return (VarField (modifiers, type_specifier, dec_pairs))
+  token ";" >> return (VarField (type_specifier, dec_pairs))
 
 let class_elem =
+  many modifier >>= fun modifiers ->
   field_declaration <|> constructor_declaration <|> method_declaration
+  >>= fun class_elem -> return (modifiers, class_elem)
 
 let class_declaration =
   many modifier >>= fun modifiers ->

@@ -137,7 +137,7 @@ let two = abs "f" @@ abs "x" @@ app f (app f x)
 let three = abs "f" @@ abs "x" @@ app f (app f (app f x))
 
 let test strat term =
-  Format.printf "Evaluating: %a\n%!" pp_lam term ;
+  Format.printf "Evaluating: %a\n%!" pp_lam term;
   let rez = apply_strat strat term in
-  Format.printf "Result:     %a\n%!" pp_lam rez ;
+  Format.printf "Result:     %a\n%!" pp_lam rez;
   rez

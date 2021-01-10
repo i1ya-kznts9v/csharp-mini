@@ -1,0 +1,28 @@
+opam-version: "2.0"
+name: "CsharpExcep"
+version: "0.0.1"
+synopsis: """ Csharp-Exception """
+#description: """ """
+maintainer: "opensource@janestreet.com"
+#authors: "Miroshnikov Vladislav <vladislaw.miroshnikov@gmail.com>"
+license: "LGPLv3"
+homepage: "not specified"
+#doc: "https://ocaml-ppx.github.io/ppxlib/"
+bug-reports: "not specified"
+depends: [
+  "ocaml" {>= "4.04.1"}
+  #"base"
+  "ppx_expect"
+  "dune" #{>= "2.7"}
+  "ocamlformat" { build }
+  "opal"
+  "ppx_deriving"
+  "ppx_show"
+]
+
+
+build: [
+  ["dune" "subst"] {pinned}
+  ["dune" "build" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs] {with-test}
+]

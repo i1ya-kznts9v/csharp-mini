@@ -2,7 +2,10 @@
  (name REPL)
  (public_name Java.Repl)
  (modules REPL)
- (libraries Java.Lib))
+ (libraries Java.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
 
 (cram
- (deps demos/demoFirst.exe))
+ (deps demos/demoParserFirst.exe demos/demoParserSecond.exe
+   demos/demoClassLoader.exe demos/demoInterpreter.exe))

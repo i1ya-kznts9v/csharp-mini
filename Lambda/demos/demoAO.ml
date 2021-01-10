@@ -22,7 +22,7 @@ let ao_small_step_strat =
     match helper t with
     | Done x -> x
     | WIP x ->
-        Format.printf " -- %a\n%!" pp_lam x ;
+        Format.printf " -- %a\n%!" pp_lam x;
         loop x in
   let on_app _ f arg = loop (app f arg) in
   let on_abs _ f x = loop (abs f x) in

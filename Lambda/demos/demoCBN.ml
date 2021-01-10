@@ -15,7 +15,7 @@ let cbn_small_step_strat =
     match helper t with
     | Ok x -> x
     | Error x ->
-        Format.printf " -- %a\n%!" pp_lam x ;
+        Format.printf " -- %a\n%!" pp_lam x;
         main x in
   let on_app _st f arg = main (App (f, arg)) in
   let on_abs _st f x = main (Abs (f, x)) in

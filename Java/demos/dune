@@ -5,8 +5,33 @@
    (-short-paths))))
 
 (executable
- (name demoFirst)
- (modules demoFirst)
+ (name demoParserFirst)
+ (modules demoParserFirst)
  (libraries Java.Lib)
+ (modes byte exe)
  (preprocess
-  (pps ppx_expect ppx_deriving.show)))
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoParserSecond)
+ (modules demoParserSecond)
+ (libraries Java.Lib)
+ (modes byte exe)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoClassLoader)
+ (modules demoClassLoader)
+ (libraries Java.Lib)
+ (modes byte exe)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoInterpreter)
+ (modules demoInterpreter)
+ (libraries Java.Lib)
+ (modes byte exe)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

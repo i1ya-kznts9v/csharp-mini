@@ -4,7 +4,7 @@ all:
 	dune build
 
 repl:
-	dune build ./REPL.exe && rlwrap _build/default/REPL.exe
+	dune exec ./REPL.exe
 
 tests: test
 test:

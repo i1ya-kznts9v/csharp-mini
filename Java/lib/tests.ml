@@ -1,7 +1,9 @@
 open Parser
 open Parser.Stmt
 open Parser.Expr
-open Opal
+open Interpreter
+
+open Interpreter.ClassLoader (Result)
 
 (* -------------------  EXPRESSIONS ------------------- *)
 
@@ -140,13 +142,13 @@ let%test _ =
   = Some (ClassCreate (Name "Car", [ Const (VInt 2); Const (VString "Ford") ]))
 
 let%test _ =
-  apply expression "get(new Sth(), new String[10])"
+  apply expression "get(new Sth(), new char[10])"
   = Some
       (CallMethod
          ( Identifier "get",
            [
              ClassCreate (Name "Sth", []);
-             ArrayCreateSized (String, Const (VInt 10));
+             ArrayCreateSized (Char, Const (VInt 10));
            ] ))
 
 let%test _ =
@@ -157,20 +159,20 @@ let%test _ =
            CallMethod (Identifier "scream", []) ))
 
 let%test _ =
-  apply expression "--(obj.f + (x + y)++)"
+  apply expression "obj.f++ + --x"
   = Some
-      (PrefDec
-         (Add
-            ( FieldAccess (Identifier "obj", Identifier "f"),
-              PostInc (Add (Identifier "x", Identifier "y")) )))
+      (Add
+         ( PostInc (FieldAccess (Identifier "obj", Identifier "f")),
+           PrefDec (Identifier "x") ))
 
 (* -------------------  STATEMENTS ---------------------*)
 
 let%test _ =
-  apply statement "int a = 0, b, c, d = 5;"
+  apply statement "final int a = 0, b, c, d = 5;"
   = Some
       (VarDec
-         ( Int,
+         ( Some Final,
+           Int,
            [
              (Name "a", Some (Const (VInt 0)));
              (Name "b", None);
@@ -182,14 +184,16 @@ let%test _ =
   apply statement "int[] a = new int[6];"
   = Some
       (VarDec
-         ( Array Int,
+         ( None,
+           Array Int,
            [ (Name "a", Some (ArrayCreateSized (Int, Const (VInt 6)))) ] ))
 
 let%test _ =
   apply statement "int a = 0, b = 1, c = 2;"
   = Some
       (VarDec
-         ( Int,
+         ( None,
+           Int,
            [
              (Name "a", Some (Const (VInt 0)));
              (Name "b", Some (Const (VInt 1)));
@@ -280,7 +284,8 @@ let%test _ =
       (For
          ( Some
              (VarDec
-                ( Int,
+                ( None,
+                  Int,
                   [
                     (Name "i", Some (Const (VInt 0)));
                     (Name "j", Some (Sub (Identifier "n", Const (VInt 1))));
@@ -296,74 +301,114 @@ let%test _ =
                         (Identifier "println", [ Const (VString "test") ]) ));
              ] ))
 
-let%test _ =
-  apply statement "if (somethingWrong()) throw new Exception();"
-  = Some
-      (If
-         ( CallMethod (Identifier "somethingWrong", []),
-           Throw (ClassCreate (Name "Exception", [])),
-           None ))
-
 let%test _ = apply statement "for(public int i = 0;;) {i++;}" = None
+
+let%test _ =
+  apply statement
+    "Figure[] list = new Figure[] {new Circle(5), new Rectangle(2,4), new \
+     Triangle()};"
+  = Some
+      (VarDec
+         ( None,
+           Array (ClassName "Figure"),
+           [
+             ( Name "list",
+               Some
+                 (ArrayCreateElements
+                    ( ClassName "Figure",
+                      [
+                        ClassCreate (Name "Circle", [ Const (VInt 5) ]);
+                        ClassCreate
+                          (Name "Rectangle", [ Const (VInt 2); Const (VInt 4) ]);
+                        ClassCreate (Name "Triangle", []);
+                      ] )) );
+           ] ))
 
 (*---------------- IN CLASSES ---------------*)
 
 let%test _ =
-  apply field_declaration "public int wheel;"
-  = Some (VarField ([ Public ], Int, [ (Name "wheel", None) ]))
+  apply class_elem "public int wheel;"
+  = Some ([ Public ], VarField (Int, [ (Name "wheel", None) ]))
 
 let%test _ =
-  apply method_declaration
+  apply class_elem
     "public int arraySum (int[] a) { int sum = 0; for (int i = 0; i < \
      a.length(); i++) {sum = sum + a[i];} return sum; }"
   = Some
-      (Method
-         ( [ Public ],
-           Int,
-           Name "arraySum",
-           [ (Array Int, Name "a") ],
-           Some
-             (StmtBlock
-                [
-                  VarDec (Int, [ (Name "sum", Some (Const (VInt 0))) ]);
-                  For
-                    ( Some (VarDec (Int, [ (Name "i", Some (Const (VInt 0))) ])),
-                      Some
-                        (Less
-                           ( Identifier "i",
-                             FieldAccess
-                               ( Identifier "a",
-                                 CallMethod (Identifier "length", []) ) )),
-                      [ PostInc (Identifier "i") ],
-                      StmtBlock
-                        [
-                          Expression
-                            (Assign
-                               ( Identifier "sum",
-                                 Add
-                                   ( Identifier "sum",
-                                     ArrayAccess (Identifier "a", Identifier "i")
-                                   ) ));
-                        ] );
-                  Return (Some (Identifier "sum"));
-                ]) ))
+      ( [ Public ],
+        Method
+          ( Int,
+            Name "arraySum",
+            [ (Array Int, Name "a") ],
+            Some
+              (StmtBlock
+                 [
+                   VarDec (None, Int, [ (Name "sum", Some (Const (VInt 0))) ]);
+                   For
+                     ( Some
+                         (VarDec
+                            (None, Int, [ (Name "i", Some (Const (VInt 0))) ])),
+                       Some
+                         (Less
+                            ( Identifier "i",
+                              FieldAccess
+                                ( Identifier "a",
+                                  CallMethod (Identifier "length", []) ) )),
+                       [ PostInc (Identifier "i") ],
+                       StmtBlock
+                         [
+                           Expression
+                             (Assign
+                                ( Identifier "sum",
+                                  Add
+                                    ( Identifier "sum",
+                                      ArrayAccess
+                                        (Identifier "a", Identifier "i") ) ));
+                         ] );
+                   Return (Some (Identifier "sum"));
+                 ]) ) )
 
 let%test _ =
-  apply constructor_declaration
+  apply class_elem
     "public Car(int speed, int[] wheels) {this.speed = speed; this.wheels = \
      wheels;}"
   = Some
-      (Constructor
-         ( [ Public ],
-           Name "Car",
-           [ (Int, Name "speed"); (Array Int, Name "wheels") ],
-           StmtBlock
-             [
-               Expression
-                 (Assign
-                    (FieldAccess (This, Identifier "speed"), Identifier "speed"));
-               Expression
-                 (Assign
-                    ( FieldAccess (This, Identifier "wheels"),
-                      Identifier "wheels" ));
-             ] ))
+      ( [ Public ],
+        Constructor
+          ( Name "Car",
+            [ (Int, Name "speed"); (Array Int, Name "wheels") ],
+            StmtBlock
+              [
+                Expression
+                  (Assign
+                     (FieldAccess (This, Identifier "speed"), Identifier "speed"));
+                Expression
+                  (Assign
+                     ( FieldAccess (This, Identifier "wheels"),
+                       Identifier "wheels" ));
+              ] ) )
+
+(* -------------------  CLASS_LOADER ------------------- *)
+
+let%test _ =
+  check_modifiers_f ([ Abstract; Static ], Method (Void, Name "m", [], None))
+  = Error "Wrong method modifiers"
+
+let%test _ =
+  check_modifiers_f ([ Public; Static ], Method (Void, Name "main", [], None))
+  = Ok ()
+
+let%test _ =
+  check_modifiers_f ([ Abstract ], VarField (Int, [ (Name "a", None) ]))
+  = Error "Wrong field modifiers"
+
+let%test _ =
+  check_modifiers_f ([ Final ], VarField (Int, [ (Name "a", None) ])) = Ok ()
+
+let%test _ =
+  check_modifiers_f ([ Final ], Constructor (Name "Car", [], StmtBlock []))
+  = Error "Wrong constructor modifiers"
+
+let%test _ =
+  check_modifiers_c (Class ([ Abstract; Final ], Name "Man", None, []))
+  = Error "Wrong class modifiers"

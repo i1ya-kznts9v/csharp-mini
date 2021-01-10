@@ -1,5 +1,4 @@
 open Java_lib.Parser
-open Opal
 open Java_lib.Ast
 
 let print_list =
@@ -11,7 +10,7 @@ let test_value =
        {| 
 public class Main
 {
-	public static void main(String[] args) {
+	public static void main() {
 		Person p = new Person(80, 45);
 		System.out.println(p.getWeight());
 		
