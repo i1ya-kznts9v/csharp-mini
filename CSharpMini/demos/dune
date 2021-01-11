@@ -31,7 +31,6 @@
  (libraries CSharpMini.Lib)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
-<<<<<<< HEAD
 
 (executable
  (name prettyPrintingTest)
@@ -39,5 +38,3 @@
  (libraries CSharpMini.Lib)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
-=======
->>>>>>> 97e0f3a26b979a150ca602322e6fbf6e86889754

@@ -1,6 +1,6 @@
 ### An implementaion of CSharpMini language in Ocaml
 
-This is a homework for functional programming course
+This is a homework for MM functional programming course
 
 License: LGPL
 
@@ -47,10 +47,7 @@ Features done:
 - 4 Full and detailed testing of all previous points
 - 5 REPL
 - 6 Standart REPL library
-<<<<<<< HEAD
 - 7 Pretty printer
-=======
->>>>>>> 97e0f3a26b979a150ca602322e6fbf6e86889754
 
 In detail:
 
@@ -58,20 +55,12 @@ In detail:
 - 2 Standard constructs: branches, loops
 - 3 Standard types: numbers, strings and operations with them
 - 4 Standard array type and operations with it
-<<<<<<< HEAD
 - 5 Recursion
 - 6 Subtype polymorphism
 - 7 OOP: classes, public methods, public fields
 - 8 OOP: Standard Base Object Class
 - 9 OOP: inheritance
 - 10 PP: Standart C# codestyle formatting
-=======
-- 5 OOP: classes, public methods, public fields
-- 6 OOP: Standard Base Object Class
-- 7 OOP: inheritance
-- 8 Recursion
-- 9 Subtype polymorphism
->>>>>>> 97e0f3a26b979a150ca602322e6fbf6e86889754
 
 Notes:
 
@@ -86,14 +75,8 @@ Notes:
 
 Features in progress:
 
-<<<<<<< HEAD
 - 1 Transformations
 - 2 Searching for new bugs and fixing them
-=======
-- 1 Pretty printer
-- 2 Transformations
-- 3 Searching for new bugs and fixing them
->>>>>>> 97e0f3a26b979a150ca602322e6fbf6e86889754
 
 Hardcoded classes:
 
