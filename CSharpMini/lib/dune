@@ -7,8 +7,8 @@
 (library
  (name csharpmini_lib)
  (public_name CSharpMini.Lib)
- (modules Ast Parser Interpreter REPL_printer REPL_stdlib Operators Helpers
-   Hashtbl_impr Tests)
+ (modules Ast Parser Interpreter Pretty_printer REPL_printer REPL_stdlib
+   Operators Helpers Hashtbl_impr Tests)
  (libraries opal ppx_show.runtime)
  (inline_tests)
  (preprocess

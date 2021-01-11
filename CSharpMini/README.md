@@ -47,6 +47,7 @@ Features done:
 - 4 Full and detailed testing of all previous points
 - 5 REPL
 - 6 Standart REPL library
+- 7 Pretty printer
 
 In detail:
 
@@ -54,11 +55,12 @@ In detail:
 - 2 Standard constructs: branches, loops
 - 3 Standard types: numbers, strings and operations with them
 - 4 Standard array type and operations with it
-- 5 OOP: classes, public methods, public fields
-- 6 OOP: Standard Base Object Class
-- 7 OOP: inheritance
-- 8 Recursion
-- 9 Subtype polymorphism
+- 5 Recursion
+- 6 Subtype polymorphism
+- 7 OOP: classes, public methods, public fields
+- 8 OOP: Standard Base Object Class
+- 9 OOP: inheritance
+- 10 PP: Standart C# codestyle formatting
 
 Notes:
 
@@ -73,9 +75,8 @@ Notes:
 
 Features in progress:
 
-- 1 Pretty printer
-- 2 Transformations
-- 3 Searching for new bugs and fixing them
+- 1 Transformations
+- 2 Searching for new bugs and fixing them
 
 Hardcoded classes:
 
