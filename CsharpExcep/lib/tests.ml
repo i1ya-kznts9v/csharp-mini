@@ -86,7 +86,17 @@ let%test _ =
   apply_parser parse_statement "int a = 0, b = 1, c = 2;"
   = Some
       (VarDeclare
-         ( Int
+         ( None
+         , Int
+         , [ ("a", Some (ConstExpr (VInt 0))); ("b", Some (ConstExpr (VInt 1)))
+           ; ("c", Some (ConstExpr (VInt 2))) ] ))
+
+let%test _ =
+  apply_parser parse_statement "const int a = 0, b = 1, c = 2;"
+  = Some
+      (VarDeclare
+         ( Some Const
+         , Int
          , [ ("a", Some (ConstExpr (VInt 0))); ("b", Some (ConstExpr (VInt 1)))
            ; ("c", Some (ConstExpr (VInt 2))) ] ))
 
@@ -159,7 +169,7 @@ let%test _ =
 }|}
   = Some
       (For
-         ( Some (VarDeclare (Int, [("i", Some (ConstExpr (VInt 0)))]))
+         ( Some (VarDeclare (None, Int, [("i", Some (ConstExpr (VInt 0)))]))
          , Some (Less (IdentVar "i", ConstExpr (VInt 9)))
          , [PostInc (IdentVar "i")]
          , StatementBlock [Print (ConstExpr (VInt 1))] ))
@@ -201,7 +211,7 @@ let%test _ =
 }|}
   = Some
       (For
-         ( Some (VarDeclare (Int, [("i", Some (ConstExpr (VInt 0)))]))
+         ( Some (VarDeclare (None, Int, [("i", Some (ConstExpr (VInt 0)))]))
          , Some (Less (IdentVar "i", ConstExpr (VInt 9)))
          , [PostInc (IdentVar "i")]
          , StatementBlock
@@ -227,9 +237,11 @@ let%test _ =
   = Some
       (Try
          ( StatementBlock
-             [ VarDeclare (Int, [("x", Some (ConstExpr (VInt 5)))])
+             [ VarDeclare (None, Int, [("x", Some (ConstExpr (VInt 5)))])
              ; VarDeclare
-                 (Int, [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))])
+                 ( None
+                 , Int
+                 , [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))] )
              ; Print (IdentVar "y") ]
          , [(None, None, StatementBlock [Print (ConstExpr (VString "excep"))])]
          , Some (StatementBlock [Print (ConstExpr (VString "finally"))]) ))
@@ -250,9 +262,11 @@ catch
   = Some
       (Try
          ( StatementBlock
-             [ VarDeclare (Int, [("x", Some (ConstExpr (VInt 5)))])
+             [ VarDeclare (None, Int, [("x", Some (ConstExpr (VInt 5)))])
              ; VarDeclare
-                 (Int, [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))])
+                 ( None
+                 , Int
+                 , [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))] )
              ; Print (IdentVar "x") ]
          , [(None, None, StatementBlock [Print (ConstExpr (VString "3"))])]
          , None ))
@@ -273,10 +287,11 @@ finally
   = Some
       (Try
          ( StatementBlock
-             [ VarDeclare (Int, [("x", Some (ConstExpr (VInt 5)))])
+             [ VarDeclare (None, Int, [("x", Some (ConstExpr (VInt 5)))])
              ; VarDeclare
-                 (Int, [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))])
-             ]
+                 ( None
+                 , Int
+                 , [("y", Some (Div (IdentVar "x", ConstExpr (VInt 0))))] ) ]
          , []
          , Some (StatementBlock []) ))
 
@@ -357,15 +372,13 @@ let%test _ =
           ( Void
           , "SayHello"
           , []
-          , Some
-              (StatementBlock
-                 [ VarDeclare (Int, [("hour", Some (ConstExpr (VInt 23)))])
-                 ; If
-                     ( More (IdentVar "hour", ConstExpr (VInt 22))
-                     , StatementBlock [Return None]
-                     , Some
-                         (StatementBlock [Print (ConstExpr (VString "Hello"))])
-                     ) ]) ) )
+          , StatementBlock
+              [ VarDeclare (None, Int, [("hour", Some (ConstExpr (VInt 23)))])
+              ; If
+                  ( More (IdentVar "hour", ConstExpr (VInt 22))
+                  , StatementBlock [Return None]
+                  , Some (StatementBlock [Print (ConstExpr (VString "Hello"))])
+                  ) ] ) )
 
 let%test _ =
   apply_parser class_elements
@@ -374,7 +387,7 @@ let%test _ =
       ( [Public]
       , Constructor
           ( "Person"
-          , [(String, IdentVar "n")]
+          , [(String, "n")]
           , StatementBlock
               [ Expression (Assign (IdentVar "name", IdentVar "n"))
               ; Expression (Assign (IdentVar "age", ConstExpr (VInt 18))) ] ) )

@@ -9,6 +9,7 @@ let reserved =
   ; "Console"; "namespace"; "using"; "int"; "bool"; "for"; "null"; "new"
   ; "return"; "break"; "continue"; "class" ]
 
+let const = token "const" >> return Const
 let parens = between (token "(") (token ")")
 let braces = between (token "{") (token "}")
 
@@ -134,8 +135,8 @@ module Stat = struct
 
   let rec parse_statement input =
     choice
-      [ continue; break; parse_expr; return_stat; if_stat; while_stat
-      ; var_declare; for_stat; throw; stat_block; print_func; try_stat ]
+      [ continue; break; parse_expr; return_stat; if_stat; while_stat; throw
+      ; var_declare; for_stat; stat_block; print_func; try_stat ]
       input
 
   and if_stat input =
@@ -162,10 +163,19 @@ module Stat = struct
       token "=" >> expr
       >>= (fun var_value -> return (var_name, Some var_value))
       <|> return (var_name, None) in
-    ( define_type
-    >>= fun var_type ->
-    sep_by1 helper (token ",")
-    >>= fun var_pair -> token ";" >> return (VarDeclare (var_type, var_pair)) )
+    choice
+      [ ( const
+        >>= fun modif ->
+        define_type
+        >>= fun var_type ->
+        sep_by1 helper (token ",")
+        >>= fun var_pair ->
+        token ";" >> return (VarDeclare (Some modif, var_type, var_pair)) )
+      ; ( define_type
+        >>= fun var_type ->
+        sep_by1 helper (token ",")
+        >>= fun var_pair ->
+        token ";" >> return (VarDeclare (None, var_type, var_pair)) ) ]
       input
 
   and stat_block input =
@@ -176,7 +186,7 @@ module Stat = struct
   and for_stat input =
     ( token "for" >> token "("
     >> choice
-         [ (parse_statement >>= fun stat -> return (Some stat))
+         [ (var_declare >>= fun stat -> return (Some stat))
          ; token ";" >> return None ]
     >>= fun declare ->
     choice
@@ -205,7 +215,8 @@ module Stat = struct
   and return_stat input =
     ( token "return"
     >> choice
-         [ (expr >>= fun result -> token ";" >> return (Return (Some result)))
+         [ ( skip_many1 space >> expr
+           >>= fun result -> token ";" >> return (Return (Some result)) )
          ; token ";" >> return (Return None) ] )
       input
 
@@ -264,7 +275,7 @@ end
 
 let get_params =
   Expr.define_type
-  >>= fun _type -> Expr.get_variable >>= fun name -> return (_type, name)
+  >>= fun _type -> Expr.ident_obj >>= fun name -> return (_type, name)
 
 let field =
   let helper =
@@ -288,7 +299,7 @@ let class_method =
   >>= fun params_list ->
   token ")" >> Stat.stat_block
   >>= fun stat_block ->
-  return (Method (method_type, method_name, params_list, Some stat_block))
+  return (Method (method_type, method_name, params_list, stat_block))
 
 let constructor =
   Expr.ident_obj

@@ -1,17 +1,32 @@
 type data_type = Int | Bool | CsClass of string | Void | String
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 type value =
   | VInt of int
   | VBool of bool
   | VVoid
   | VNull
-  | VChar of char
   | VString of string
-  | VClass
-[@@deriving show]
+  | VClass of obj_ref
+[@@deriving show {with_path= false}]
 
-type modifier = Public | Static | Override | Const [@@deriving show]
+and field_ref =
+  { key: string
+  ; f_type: data_type
+  ; f_value: value
+  ; is_const: bool
+  ; assignment_count: int }
+
+and obj_ref =
+  | ObjNull
+  | ObjRef of
+      { class_key: string
+      ; parent_key: string option
+      ; class_table: (string, field_ref) Hashtbl_der.t
+      ; number: int }
+
+type modifier = Public | Static | Override | Const
+[@@deriving show {with_path= false}]
 
 type expr =
   | Add of expr * expr
@@ -39,7 +54,7 @@ type expr =
   | ClassCreate of string * expr list (*first - name, other - args list*)
   | CallMethod of string * expr list
   | Assign of expr * expr
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 and statement =
   | For of statement option * expr option * expr list * statement (*because you can write for(int i = 0, j = 5; i < 4; i++, j--)*)
@@ -48,7 +63,7 @@ and statement =
   | Break
   | Continue
   | Return of expr option
-  | VarDeclare of data_type * (string * expr option) list
+  | VarDeclare of modifier option * data_type * (string * expr option) list
   | Expression of expr
   | Throw of expr
   | StatementBlock of statement list
@@ -60,13 +75,13 @@ and statement =
           next expr option is a filter (when (y==0 && x == 0)), statement is the body of catch*)
       * statement option (*it is the finally body*)
   | Print of expr
-[@@deriving show]
+[@@deriving show {with_path= false}]
 
 and field =
   | VariableField of data_type * (string * expr option) list (*example: static int a = 3, b*)
-  | Method of data_type * string * (data_type * expr) list * statement option
-  | Constructor of string * (data_type * expr) list * statement
-[@@deriving show]
+  | Method of data_type * string * (data_type * string) list * statement
+  | Constructor of string * (data_type * string) list * statement
+[@@deriving show {with_path= false}]
 
 and cs_class =
   | Class of
@@ -75,4 +90,4 @@ and cs_class =
       * string option
       (*parent class*)
       * (modifier list * field) list
-[@@deriving show]
+[@@deriving show {with_path= false}]

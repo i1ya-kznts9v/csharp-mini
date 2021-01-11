@@ -5,8 +5,29 @@
    (-short-paths))))
 
 (executable
- (name demoFirst)
- (modules demoFirst)
+ (name demoParser)
+ (modules demoParser)
  (libraries CsharpExcep.Lib)
  (preprocess
-  (pps ppx_expect ppx_deriving.show)))
+  (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoLoad)
+ (modules demoLoad)
+ (libraries CsharpExcep.Lib)
+ (preprocess
+  (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoInterpreter)
+ (modules demoInterpreter)
+ (libraries CsharpExcep.Lib)
+ (preprocess
+  (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoException)
+ (modules demoException)
+ (libraries CsharpExcep.Lib)
+ (preprocess
+  (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))

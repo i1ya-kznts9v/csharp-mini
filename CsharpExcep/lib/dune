@@ -7,8 +7,9 @@
 (library
  (name csharp_lib)
  (public_name CsharpExcep.Lib)
- (modules Ast Parser Tests)
+ (modules Ast Parser Tests Interpreter Hashtbl_der Operators Extractors
+   Standlib REPL_printing)
  (libraries opal ppx_show.runtime)
  (inline_tests)
  (preprocess
-  (pps ppx_expect ppx_show)))
+  (pps ppx_expect ppx_show ppx_deriving.eq)))

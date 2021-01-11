@@ -2,7 +2,10 @@
  (name REPL)
  (public_name CsharpExcep.Repl)
  (modules REPL)
- (libraries CsharpExcep.Lib))
+ (libraries CsharpExcep.Lib str)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
 
 (cram
- (deps demos/demoFirst.exe))
+ (deps demos/demoParser.exe demos/demoLoad.exe demos/demoInterpreter.exe
+   demos/demoException.exe))
