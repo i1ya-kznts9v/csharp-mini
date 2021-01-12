@@ -1,5 +1,5 @@
   $ (cd ../../../../default && demos/renameTransformationTest.exe)
-  -_-_-_-_-_-_-_-_-_-_- First variables rename transformating testing -_-_-_-_-_-_-_-_-_-_-
+  -_-_-_-_-_-_-_-_-_-_- First rename transformating testing -_-_-_-_-_-_-_-_-_-_-
   
   -- int i = 0;
   ++ int k = 0;
@@ -46,7 +46,7 @@
   -- arr[i] = 1;
   ++ arr[k] = 1;
   
-  -_-_-_-_-_-_-_-_-_-_- Second variables rename transformating testing -_-_-_-_-_-_-_-_-_-_-
+  -_-_-_-_-_-_-_-_-_-_- Second rename transformating testing -_-_-_-_-_-_-_-_-_-_-
   
   --  string name;
   ++  string ident;
@@ -60,7 +60,7 @@
   -- public Child(int age, string name) : base(age, name)
   ++ public Child(int age, string ident) : base(age, ident)
   
-  -_-_-_-_-_-_-_-_-_-_- Third variables rename transformating testing -_-_-_-_-_-_-_-_-_-_-
+  -_-_-_-_-_-_-_-_-_-_- Third rename transformating testing -_-_-_-_-_-_-_-_-_-_-
   
   -- public int GetFact(int n)
   ++ public int GetFact(int number)
