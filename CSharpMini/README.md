@@ -48,6 +48,7 @@ Features done:
 - 5 REPL
 - 6 Standart REPL library
 - 7 Pretty printer
+- 8 Transformations: variables renaming
 
 In detail:
 
@@ -75,7 +76,7 @@ Notes:
 
 Features in progress:
 
-- 1 Transformations
+- 1 More transformations
 - 2 Searching for new bugs and fixing them
 
 Hardcoded classes:

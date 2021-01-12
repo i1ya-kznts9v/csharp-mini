@@ -8,4 +8,5 @@
 
 (cram
  (deps demos/parserTest.exe demos/classLoaderTest.exe
-   demos/parserVisitorPatternTest.exe demos/interpretationTest.exe))
+   demos/parserVisitorPatternTest.exe demos/interpretationTest.exe
+   demos/prettyPrintingTest.exe demos/renameTransformationTest.exe))
