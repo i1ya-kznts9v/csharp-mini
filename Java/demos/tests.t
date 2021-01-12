@@ -1941,7 +1941,7 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (a)]; length = 1;
-                                             number = 2 }));
+                                             number = 3 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
@@ -1963,11 +1963,11 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (a); VChar (b)];
-                                             length = 2; number = 7 }));
+                                             length = 2; number = 9 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 6 })); scope_level = 0
+  ; number = 8 })); scope_level = 0
   }
   
   "val7" ->
@@ -1989,11 +1989,11 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (a); VChar (2)];
-                                             length = 2; number = 10 }));
+                                             length = 2; number = 12 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 9 })); scope_level = 0
+  ; number = 11 })); scope_level = 0
   }
   
   "val3" ->
@@ -2015,11 +2015,11 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (2); VChar (b)];
-                                             length = 2; number = 13 }));
+                                             length = 2; number = 15 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 12 })); scope_level = 0
+  ; number = 14 })); scope_level = 0
   }
   
   "val4" ->
@@ -2037,11 +2037,11 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (b)]; length = 1;
-                                             number = 4 }));
+                                             number = 6 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 3 })); scope_level = 0
+  ; number = 4 })); scope_level = 0
   }
   
   "val5" ->
@@ -2066,13 +2066,13 @@
                            f_value =
                            VArray (Arr ({ a_type = Char;
                                           values = [VChar (2); VChar (b)];
-                                          length = 2; number = 13 }));
+                                          length = 2; number = 15 }));
                            is_not_mutable = true; assignment_count = 0 }
                       
   ]]
-  ; number = 12 })); runtime_signal = NoSignal; curr_method_type = Void;
+  ; number = 14 })); runtime_signal = NoSignal; curr_method_type = Void;
   is_main_scope = true; nested_loops_cnt = 0; scope_level = 0;
-  cur_constr_key = None; prev_context = None; obj_created_cnt = 13;
+  cur_constr_key = None; prev_context = None; obj_created_cnt = 15;
   is_creation = false; constr_affilation = None
   }
   
@@ -2092,7 +2092,7 @@
                                   f_value =
                                   VArray (Arr ({ a_type = Char;
                                                  values = [VChar (a)];
-                                                 length = 1; number = 2 }));
+                                                 length = 1; number = 3 }));
                                   is_not_mutable = true; assignment_count = 0 }
                              
   ]]
@@ -2133,15 +2133,15 @@
                                              values =
                                              [VChar (A); VChar (l); VChar (i);
                                               VChar (c); VChar (e)];
-                                             length = 5; number = 11 }));
+                                             length = 5; number = 20 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 10 })); is_not_mutable = false; assignment_count = 0
+  ; number = 18 })); is_not_mutable = false; assignment_count = 0
   }
   
   ]]
-  ; number = 10 })); scope_level = 0
+  ; number = 17 })); scope_level = 0
   }
   
   "b" ->
@@ -2177,15 +2177,15 @@
                               VArray (Arr ({ a_type = Char;
                                              values =
                                              [VChar (B); VChar (o); VChar (b)];
-                                             length = 3; number = 10 }));
+                                             length = 3; number = 16 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 9 })); is_not_mutable = false; assignment_count = 0
+  ; number = 14 })); is_not_mutable = false; assignment_count = 0
   }
   
   ]]
-  ; number = 9 })); scope_level = 0
+  ; number = 13 })); scope_level = 0
   }
   
   "p1" ->
@@ -2209,15 +2209,15 @@
                               VArray (Arr ({ a_type = Char;
                                              values =
                                              [VChar (B); VChar (o); VChar (b)];
-                                             length = 3; number = 10 }));
+                                             length = 3; number = 16 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 9 })); is_not_mutable = false; assignment_count = 0
+  ; number = 14 })); is_not_mutable = false; assignment_count = 0
   }
   
   ]]
-  ; number = 9 })); scope_level = 0
+  ; number = 13 })); scope_level = 0
   }
   
   "s2" ->
@@ -2231,11 +2231,11 @@
                               f_value =
                               VArray (Arr ({ a_type = Char;
                                              values = [VChar (b)]; length = 1;
-                                             number = 4 }));
+                                             number = 6 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 3 })); scope_level = 0
+  ; number = 4 })); scope_level = 0
   }
   
   "lVal" ->
@@ -2286,15 +2286,351 @@
   ; last_expr_result = VInt (1); runtime_signal = NoSignal;
   curr_method_type = Void; is_main_scope = true; nested_loops_cnt = 0;
   scope_level = 0; cur_constr_key = None; prev_context = None;
-  obj_created_cnt = 10; is_creation = false; constr_affilation = None
+  obj_created_cnt = 20; is_creation = false; constr_affilation = None
   }
   
   ------------------- SIMPLE METHOD CALL TEST ------------------
-  No such field
+  { cur_object =
+    RObj ({ class_key = "Main"; field_ref_table = [[]]
+                                ; number = 0 });
+    var_table =
+    [["a1" ->
+       { v_type = Int; v_key = "a1"; is_not_mutable = false;
+         assignment_count = 1; v_value = VInt (25); scope_level = 0 }
+    
+  "res" ->
+   { v_type = Int; v_key = "res"; is_not_mutable = false; assignment_count = 1;
+     v_value = VInt (125); scope_level = 0 }
+  
+  "person" ->
+   { v_type = ClassName ("Person"); v_key = "person"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (30);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  ]]
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = Void; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 1; is_creation = false; constr_affilation = None
+  }
+  
   ------------------- UPDATE OBJECT STATE IN MAIN TEST ------------------
-  No such field
+  { cur_object =
+    RObj ({ class_key = "Main"; field_ref_table = [[]]
+                                ; number = 0 });
+    var_table =
+    [["p2" ->
+       { v_type = ClassName ("Person"); v_key = "p2"; is_not_mutable = false;
+         assignment_count = 1;
+         v_value =
+         VObjectRef (RObj ({ class_key = "Person";
+                             field_ref_table =
+                             [["age" ->
+                                { key = "age"; f_type = Int;
+                                  f_value = VInt (55); is_not_mutable = false;
+                                  assignment_count = 1 }
+                             
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  "p3" ->
+   { v_type = ClassName ("Person"); v_key = "p3"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (55);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  "p1" ->
+   { v_type = ClassName ("Person"); v_key = "p1"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (55);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  "person" ->
+   { v_type = ClassName ("Person"); v_key = "person"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (55);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  ]]
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = Void; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 4; is_creation = false; constr_affilation = None
+  }
+  
   ------------------- CHILD WORKING TEST ------------------
-  No such field
+  { cur_object =
+    RObj ({ class_key = "Main"; field_ref_table = [[]]
+                                ; number = 0 });
+    var_table =
+    [["childSecond" ->
+       { v_type = ClassName ("Child"); v_key = "childSecond";
+         is_not_mutable = false; assignment_count = 1;
+         v_value =
+         VObjectRef (RObj ({ class_key = "Child";
+                             field_ref_table =
+                             [["parent" ->
+                                { key = "parent";
+                                  f_type = ClassName ("Person");
+                                  f_value =
+                                  VObjectRef (RObj ({ class_key = "Person";
+                                                      field_ref_table =
+                                                      [["age" ->
+                                                         { key = "age";
+                                                           f_type = Int;
+                                                           f_value = VInt (27);
+                                                           is_not_mutable =
+                                                           false;
+                                                           assignment_count = 1
+                                                           }
+                                                      
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  "age" ->
+   { key = "age"; f_type = Int; f_value = VInt (20); is_not_mutable = false;
+     assignment_count = 1 }
+  
+  "name" ->
+   { key = "name"; f_type = ClassName ("String"); f_value = VObjectRef (RNull);
+     is_not_mutable = false; assignment_count = 0 }
+  
+  ]]
+  ; number = 13 })); scope_level = 0
+  }
+  
+  "person" ->
+   { v_type = ClassName ("Person"); v_key = "person"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (27);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  "childFirst" ->
+   { v_type = ClassName ("Child"); v_key = "childFirst";
+     is_not_mutable = false; assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Child";
+                         field_ref_table =
+                         [["parent" ->
+                            { key = "parent"; f_type = ClassName ("Person");
+                              f_value =
+                              VObjectRef (RObj ({ class_key = "Person";
+                                                  field_ref_table =
+                                                  [["age" ->
+                                                     { key = "age";
+                                                       f_type = Int;
+                                                       f_value = VInt (40);
+                                                       is_not_mutable = false;
+                                                       assignment_count = 0 }
+                                                  
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (F); VChar (l); VChar (e);
+                                              VChar (x); VChar (e); VChar (r)];
+                                             length = 6; number = 12 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 10 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 9 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  "age" ->
+   { key = "age"; f_type = Int; f_value = VInt (4); is_not_mutable = false;
+     assignment_count = 1 }
+  
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (A); VChar (l); VChar (i);
+                                              VChar (c); VChar (e)];
+                                             length = 5; number = 8 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 6 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 5 })); scope_level = 0
+  }
+  
+  ]]
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = Void; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 13; is_creation = false; constr_affilation = None
+  }
+  
   ------------------- SCOPE TEST ------------------
   { cur_object =
     RObj ({ class_key = "Main"; field_ref_table = [[]]
@@ -2426,7 +2762,104 @@
   }
   
   ------------------- CHANGE OF OBJECT STATE IN OTHER CONTEXT ------------------
-  No such field
+  { cur_object =
+    RObj ({ class_key = "Main"; field_ref_table = [[]]
+                                ; number = 0 });
+    var_table =
+    [["child" ->
+       { v_type = ClassName ("Child"); v_key = "child"; is_not_mutable = false;
+         assignment_count = 1;
+         v_value =
+         VObjectRef (RObj ({ class_key = "Child";
+                             field_ref_table =
+                             [["parent" ->
+                                { key = "parent";
+                                  f_type = ClassName ("Person");
+                                  f_value =
+                                  VObjectRef (RObj ({ class_key = "Person";
+                                                      field_ref_table =
+                                                      [["age" ->
+                                                         { key = "age";
+                                                           f_type = Int;
+                                                           f_value = VInt (30);
+                                                           is_not_mutable =
+                                                           false;
+                                                           assignment_count = 1
+                                                           }
+                                                      
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  "age" ->
+   { key = "age"; f_type = Int; f_value = VInt (0); is_not_mutable = false;
+     assignment_count = 0 }
+  
+  "name" ->
+   { key = "name"; f_type = ClassName ("String"); f_value = VObjectRef (RNull);
+     is_not_mutable = false; assignment_count = 0 }
+  
+  ]]
+  ; number = 5 })); scope_level = 0
+  }
+  
+  "person" ->
+   { v_type = ClassName ("Person"); v_key = "person"; is_not_mutable = false;
+     assignment_count = 1;
+     v_value =
+     VObjectRef (RObj ({ class_key = "Person";
+                         field_ref_table =
+                         [["age" ->
+                            { key = "age"; f_type = Int; f_value = VInt (30);
+                              is_not_mutable = false; assignment_count = 1 }
+                         
+  "name" ->
+   { key = "name"; f_type = ClassName ("String");
+     f_value =
+     VObjectRef (RObj ({ class_key = "String";
+                         field_ref_table =
+                         [["value" ->
+                            { key = "value"; f_type = Array (Char);
+                              f_value =
+                              VArray (Arr ({ a_type = Char;
+                                             values =
+                                             [VChar (B); VChar (o); VChar (b)];
+                                             length = 3; number = 4 }));
+                              is_not_mutable = true; assignment_count = 0 }
+                         
+  ]]
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
+  }
+  
+  ]]
+  ; number = 1 })); scope_level = 0
+  }
+  
+  ]]
+  ; last_expr_result = VVoid; runtime_signal = NoSignal;
+  curr_method_type = Void; is_main_scope = true; nested_loops_cnt = 0;
+  scope_level = 0; cur_constr_key = None; prev_context = None;
+  obj_created_cnt = 5; is_creation = false; constr_affilation = None
+  }
+  
   ------------------- PATTERN VISITOR TEST ------------------
   { cur_object =
     RObj ({ class_key = "Main"; field_ref_table = [[]]
@@ -2624,11 +3057,11 @@
                                              values =
                                              [VChar (M); VChar (a); VChar (r);
                                               VChar (s)];
-                                             length = 4; number = 2 }));
+                                             length = 4; number = 4 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 1 })); is_not_mutable = false; assignment_count = 0
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
   }
   
   ]]
@@ -2660,17 +3093,17 @@
                                              values =
                                              [VChar (M); VChar (a); VChar (r);
                                               VChar (s)];
-                                             length = 4; number = 2 }));
+                                             length = 4; number = 4 }));
                               is_not_mutable = true; assignment_count = 0 }
                          
   ]]
-  ; number = 1 })); is_not_mutable = false; assignment_count = 0
+  ; number = 2 })); is_not_mutable = false; assignment_count = 0
   }
   
   ]]
   ; number = 1 })); runtime_signal = NoSignal; curr_method_type = Void;
   is_main_scope = true; nested_loops_cnt = 0; scope_level = 0;
-  cur_constr_key = None; prev_context = None; obj_created_cnt = 1;
+  cur_constr_key = None; prev_context = None; obj_created_cnt = 4;
   is_creation = false; constr_affilation = None
   }
   
@@ -2740,3 +3173,193 @@
   is_creation = false; constr_affilation = None
   }
   
+
+  $ (cd ../../../../default && demos/demoPrettyPrinter.exe)
+  public class Main 
+  {
+     public static void main() 
+     {
+        Figure[] list = new Figure[] {new Circle(5), new Rectangle(2, 4), new Triangle()};
+        AreaVisitor areaVisitor = new AreaVisitor();
+        PerimeterVisitor perimeterVisitor = new PerimeterVisitor();
+        for (int i = 0; i < list.length; i++) 
+        {
+           System.out.println(list[i].accept(areaVisitor));
+        }
+        for (int j = 0; j < list.length; j++) 
+        {
+           System.out.println(list[j].accept(perimeterVisitor));
+        }
+     }
+  }
+  
+  abstract class Figure 
+  {
+     abstract int accept(Visitor v);
+  }
+  
+  abstract class Visitor 
+  {
+     abstract int visit(Circle circle);
+     
+     abstract int visit(Rectangle rectangle);
+     
+     abstract int visit(Triangle triangle);
+  }
+  
+  class AreaVisitor extends Visitor 
+  {
+     @Override
+     int visit(Circle circle) 
+     {
+        return 3 * circle.radius * circle.radius;
+     }
+     
+     @Override
+     int visit(Rectangle rectangle) 
+     {
+        return rectangle.a * rectangle.b;
+     }
+     
+     @Override
+     int visit(Triangle triangle) 
+     {
+        int p = (triangle.a + triangle.b + triangle.c) / 2;
+        return p * (p - triangle.a) * (p - triangle.b) * (p - triangle.c);
+     }
+  }
+  
+  class PerimeterVisitor extends Visitor 
+  {
+     @Override
+     int visit(Circle circle) 
+     {
+        return 2 * 3 * circle.radius;
+     }
+     
+     @Override
+     int visit(Rectangle rectangle) 
+     {
+        return (rectangle.a + rectangle.b) * 2;
+     }
+     
+     @Override
+     int visit(Triangle triangle) 
+     {
+        return triangle.a + triangle.b + triangle.c;
+     }
+  }
+  
+  class Circle extends Figure 
+  {
+     public int radius;
+     
+     public Circle(int radius) 
+     {
+        this.radius = radius;
+     }
+     
+     public Circle() 
+     {
+        this.radius = 1;
+     }
+     
+     @Override
+     int accept(Visitor v) 
+     {
+        return v.visit(this);
+     }
+  }
+  
+  class Triangle extends Figure 
+  {
+     public int a, b, c;
+     
+     public Triangle(int a, int b, int c) 
+     {
+        this.a = a;
+        this.b = b;
+        this.c = c;
+     }
+     
+     public Triangle() 
+     {
+        this.a = 1;
+        this.b = 1;
+        this.c = 1;
+     }
+     
+     @Override
+     int accept(Visitor v) 
+     {
+        return v.visit(this);
+     }
+  }
+  
+  class Rectangle extends Figure 
+  {
+     public int a, b;
+     
+     public Rectangle() 
+     {
+        this.a = 1;
+        this.b = 1;
+     }
+     
+     public Rectangle(int a, int b) 
+     {
+        this.a = a;
+        this.b = b;
+     }
+     
+     @Override
+     int accept(Visitor v) 
+     {
+        return v.visit(this);
+     }
+  }
+  public class Main 
+  {
+     public static void main() 
+     {
+        int[] arr = new int[] {15, 14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0};
+        QuickSorter quickSorter = new QuickSorter();
+        int n = 16;
+        int low = 0;
+        int high = 15;
+        quickSorter.quickSort(arr, n, low, high);
+     }
+  }
+  
+  class QuickSorter 
+  {
+     public void quickSort(int[] array, int n, int low, int high) 
+     {
+        if (n == 0) return;
+        if (low >= high) return;
+        int middle = low + (high - low) / 2;
+        int pivot = array[middle];
+        int i = low, j = high;
+        while (i <= j) 
+        {
+           while (array[i] < pivot) 
+           {
+              i++;
+           }
+           while (array[j] > pivot) 
+           {
+              j--;
+           }
+           if (i <= j) 
+           {
+              int temp = array[i];
+              array[i] = array[j];
+              array[j] = temp;
+              i++;
+              j--;
+           }
+        }
+        if (low < j) quickSort(array, n, low, j);
+        if (high > i) quickSort(array, n, i, high);
+     }
+  }

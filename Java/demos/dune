@@ -35,3 +35,11 @@
  (modes byte exe)
  (preprocess
   (pps ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoPrettyPrinter)
+ (modules demoPrettyPrinter)
+ (libraries Java.Lib)
+ (modes byte exe)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))

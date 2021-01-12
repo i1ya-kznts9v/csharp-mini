@@ -1,0 +1,10 @@
+(executable
+ (name REPL)
+ (public_name Bash.Repl)
+ (modules REPL)
+ (libraries Bash.Lib)
+ (preprocess
+  (pps ppx_deriving.show ppx_deriving.eq)))
+
+(cram
+ (deps demos/demoFirst.exe))

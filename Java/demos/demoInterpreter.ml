@@ -159,23 +159,21 @@ let test_val =
 public class Main {
 
     public static void main() {
-        Person person = new Person(25, "Bob");
+        Person person = new Person(25);
         int res = person.sum(25, 100);
         int a1 = person.getAge();
         person.setAge(30);
-        int a2 = person.getAge(); 
     }
 }
 
 class Person {
     int age;
-    String name;
 
     public Person() {}
 
-    public Person(int age, String name) {
+    public Person(int age) {
         this.age = age;
-        this.name = name;
+
     }
 
     public int sum(int a, int b) {
@@ -213,7 +211,6 @@ public class Main {
         p2 = p1;
         p3 = p2;
         person.setAge(55);
-        int res = p2.getAge(); 
     }
 }
 

@@ -41,6 +41,8 @@ let startswith test_str sub_str =
     let sub = String.sub test_str 0 (String.length sub_str) in
     String.equal sub sub_str
 
+let show_hashtbl ht pp_k pp_el = pp pp_k pp_el Format.std_formatter ht
+
 let convert_table_to_seq = Hashtbl.to_seq_values
 
 let seq_hd_exn s =
@@ -1819,10 +1821,13 @@ module Main (M : MONADERROR) = struct
             let get_new_var_table =
               try
                 prepare_table_with_args_exn (Hashtbl.create 100) c_args
-                  constr_r.args ctx class_table
+                  constr_r.args
+                  { ctx with obj_created_cnt = initres_ctx.obj_created_cnt }
+                  class_table
               with Invalid_argument m -> error m
             in
-            get_new_var_table >>= fun (vt, _) ->
+            get_new_var_table >>= fun (vt, vctx) ->
+            (* print_endline ("VCTX:" ^ show_context vctx); *)
             prepare_constructor_block constr_r.body obj_class >>= fun c_body ->
             (* Контекст, в котором исполняется блок - получившийся объект + таблица переменных - аргументы конструктора *)
             eval_stmt c_body
@@ -1833,6 +1838,7 @@ module Main (M : MONADERROR) = struct
                 is_main_scope = false;
                 constr_affilation = Some obj_class.this_key;
                 cur_constr_key = Some constr_r.key;
+                obj_created_cnt = vctx.obj_created_cnt;
               }
               class_table
             >>= fun c_ctx ->
@@ -1992,7 +1998,7 @@ module Main (M : MONADERROR) = struct
                 |> fun _ -> return val_evaled_ctx
               with
               | Invalid_argument m -> error m
-              | Not_found -> error "No such field"
+              | Not_found -> error ("No such field: " ^ show_key_t var_key)
           else error "No such variable"
 
   and update_field_v obj_expr f_name val_evaled_ctx class_table =
@@ -2018,7 +2024,7 @@ module Main (M : MONADERROR) = struct
       else error "No such field in class"
     with
     | Invalid_argument m | Failure m -> error m
-    | Not_found -> error "No such field"
+    | Not_found -> error ("No such field: " ^ show_key_t f_name)
 
   and update_array_state_exn arr index new_value update_ctx =
     let rec update_states f_ht i n_val a_n =

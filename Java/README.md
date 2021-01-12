@@ -17,7 +17,7 @@ Author: Bozhnyuk Alexander, bozhnyuks@mail.ru
 - 8) Работа с реплом: запуск факториала 
     ```
     > int fac1(int acc, int n) {if (n <= 1) return acc; else return fac1(acc * n, n - 1); }@
-    > int fac(int n) {return fac(1, n);}@
+    > int fac(int n) {return fac1(1, n);}@
     > fac(5)@
     > Result: VInt (120)
     ```

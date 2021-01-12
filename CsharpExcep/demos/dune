@@ -31,3 +31,10 @@
  (libraries CsharpExcep.Lib)
  (preprocess
   (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
+
+(executable
+ (name demoPrettyPrinter)
+ (modules demoPrettyPrinter)
+ (libraries CsharpExcep.Lib)
+ (preprocess
+  (pps ppx_expect ppx_deriving.show ppx_deriving.eq)))
